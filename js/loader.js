@@ -21,7 +21,7 @@
   }
 
   // Busca lista de mídias no GitHub
-  const GITHUB_API = 'https://api.github.com/repos/lucakassab/tour360/contents/media';
+  const GITHUB_API = 'https://api.github.com/repos/lucakassab/tour_360_beta/contents/media';
   const EXT = ['.jpg', '.png', '.mp4', '.webm', '.mov'];
   let mediaList = [];
   try {
