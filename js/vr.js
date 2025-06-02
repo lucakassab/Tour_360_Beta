@@ -1,22 +1,18 @@
-
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+// vr.js
 import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js?module';
 import {
+  THREE,
   scene,
   camera,
   renderer,
   loadMediaInSphere,
   showButtonHUD,
   updateHUDPositions,
-  
   lastMediaURL,
   lastMediaStereo
 } from './core.js';
 
 export let onEnterXR = null;
-
-
-
 
 const BUTTON_LABEL = {
   0: 'Trigger',
@@ -26,15 +22,13 @@ const BUTTON_LABEL = {
   5: 'B'
 };
 
-
 let canRotateLeft  = true;
 let canRotateRight = true;
-
 
 function changeMediaInSelect(delta) {
   const select = document.getElementById('mediaSelect');
   const len = select.options.length;
-  if (len === 0) return;
+  if (!len) return;
 
   let idx = parseInt(select.value);
   idx = (idx + delta + len) % len;
@@ -47,7 +41,6 @@ function changeMediaInSelect(delta) {
   loadMediaInSphere(url, stereo);
 }
 
-
 function rotateScene(angleDeg) {
   const angleRad = THREE.MathUtils.degToRad(angleDeg);
   scene.rotation.y += angleRad;
@@ -57,19 +50,16 @@ export function initialize() {
   if (renderer.xr.enabled) return;
   renderer.xr.enabled = true;
 
-  
   document.body.appendChild(VRButton.createButton(renderer));
 
-  
   renderer.xr.addEventListener('sessionstart', () => {
     if (typeof onEnterXR === 'function') onEnterXR();
-    
+
     if (lastMediaURL) {
       loadMediaInSphere(lastMediaURL, lastMediaStereo);
     }
   });
 
-  
   renderer.setAnimationLoop(loop);
 }
 
@@ -80,33 +70,32 @@ function loop() {
       if (!source.gamepad) return;
       const gp = source.gamepad;
 
-      
+      // Botão “A” (índice 4) vai pra mídia anterior
       if (gp.buttons[4]?.pressed) {
         showButtonHUD(BUTTON_LABEL[4]);
-        changeMediaInSelect(-1);   
+        changeMediaInSelect(-1);
       }
+      // Botão “B” (índice 5) vai pra próxima mídia
       if (gp.buttons[5]?.pressed) {
         showButtonHUD(BUTTON_LABEL[5]);
-        changeMediaInSelect(+1);   
+        changeMediaInSelect(+1);
       }
 
-      
-      
-      
+      // Pega o eixo horizontal do analógico (eixos[2] ou eixos[0])
       const axisH = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
-      
+
       if (axisH > 0.5 && canRotateRight) {
         rotateScene(-20);
         canRotateRight = false;
         canRotateLeft  = true;
       }
-      
+
       if (axisH < -0.5 && canRotateLeft) {
         rotateScene(+20);
-        canRotateLeft  = false;
+        canRotateLeft = false;
         canRotateRight = true;
       }
-      
+
       if (axisH >= -0.5 && axisH <= 0.5) {
         canRotateLeft = true;
         canRotateRight = true;
@@ -114,13 +103,11 @@ function loop() {
     });
   }
 
-  
   updateHUDPositions();
   renderer.render(scene, camera);
 }
 
 export function loadMedia(url, stereo) {
-  
   if (stereo) {
     camera.layers.enable(1);
     camera.layers.enable(2);

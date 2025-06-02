@@ -1,4 +1,6 @@
+// core.js
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+export { THREE }; // <-- Exporta o THREE pra galera usar
 
 export let scene, camera, renderer;
 
@@ -28,7 +30,6 @@ export function initializeCore() {
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  
   loadingCanvas = document.createElement('canvas');
   loadingCanvas.width = 512; loadingCanvas.height = 128;
   const ctxL = loadingCanvas.getContext('2d');
@@ -46,7 +47,6 @@ export function initializeCore() {
   loadingMesh.visible = false;
   scene.add(loadingMesh);
 
-  
   buttonCanvas = document.createElement('canvas');
   buttonCanvas.width = 512; buttonCanvas.height = 128;
   const ctxB = buttonCanvas.getContext('2d');
@@ -65,7 +65,7 @@ export function initializeCore() {
   scene.add(buttonHUDMesh);
 }
 
-export function showLoading()  { loadingMesh.visible = true;  }
+export function showLoading()  { loadingMesh.visible = true; }
 export function hideLoading()  { loadingMesh.visible = false; }
 
 export function updateHUDPositions() {
@@ -100,7 +100,6 @@ export function showButtonHUD(txt) {
 }
 
 export async function loadMediaInSphere(url, isStereo) {
-  
   lastMediaURL = url;
   lastMediaStereo = isStereo;
 
@@ -146,9 +145,7 @@ export async function loadMediaInSphere(url, isStereo) {
     );
   }
 
-  
   if (isStereo && !renderer.xr.isPresenting) {
-    
     const mat = new THREE.MeshBasicMaterial({ map: tex });
     mat.map.repeat.set(1, 0.5);
     mat.map.offset.set(0, 0.5);
@@ -156,7 +153,6 @@ export async function loadMediaInSphere(url, isStereo) {
     currentMesh = new THREE.Mesh(geo, mat);
 
   } else if (isStereo && renderer.xr.isPresenting) {
-    
     const matL = new THREE.MeshBasicMaterial({ map: tex.clone() });
     matL.map.repeat.set(1, 0.5);
     matL.map.offset.set(0, 0.5);
@@ -175,7 +171,6 @@ export async function loadMediaInSphere(url, isStereo) {
     currentMesh.add(meshL, meshR);
 
   } else {
-    
     currentMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
   }
 
