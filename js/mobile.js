@@ -1,4 +1,5 @@
 // mobile.js
+// Importa o THREE, mas como o core.js já carregou com ?module, sobra tudo certinho
 import { THREE, initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
 
 let isDragging = false;

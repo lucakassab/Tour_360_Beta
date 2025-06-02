@@ -1,4 +1,5 @@
 // vr.js
+// Mesma ideia: import VRButton com ?module e o THREE vem do core.js
 import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js?module';
 import {
   THREE,
@@ -28,7 +29,7 @@ let canRotateRight = true;
 function changeMediaInSelect(delta) {
   const select = document.getElementById('mediaSelect');
   const len = select.options.length;
-  if (len === 0) return;
+  if (!len) return;
 
   let idx = parseInt(select.value);
   idx = (idx + delta + len) % len;
@@ -54,7 +55,6 @@ export function initialize() {
 
   renderer.xr.addEventListener('sessionstart', () => {
     if (typeof onEnterXR === 'function') onEnterXR();
-
     if (lastMediaURL) {
       loadMediaInSphere(lastMediaURL, lastMediaStereo);
     }
@@ -70,18 +70,18 @@ function loop() {
       if (!source.gamepad) return;
       const gp = source.gamepad;
 
-      // Botão A (índice 4) → mídia anterior
+      // Botão A (4) → anterior
       if (gp.buttons[4]?.pressed) {
         showButtonHUD(BUTTON_LABEL[4]);
         changeMediaInSelect(-1);
       }
-      // Botão B (índice 5) → próxima mídia
+      // Botão B (5) → próximo
       if (gp.buttons[5]?.pressed) {
         showButtonHUD(BUTTON_LABEL[5]);
         changeMediaInSelect(+1);
       }
 
-      // Eixo horizontal do analógico pra rotação suave
+      // Eixo horizontal do stick
       const axisH = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
       if (axisH > 0.5 && canRotateRight) {
         rotateScene(-20);

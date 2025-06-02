@@ -1,4 +1,4 @@
-// loader.js
+// loader.js 
 (async () => {
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const canVR    = navigator.xr && await navigator.xr.isSessionSupported?.('immersive-vr');

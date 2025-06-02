@@ -1,4 +1,5 @@
 // desktop.js
+// Aqui a gente usa o OrbitControls importado com ?module, que também vai apontar pro mesmo Three.js do core.js
 import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js?module';
 import { initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
 

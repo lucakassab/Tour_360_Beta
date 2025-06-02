@@ -1,6 +1,7 @@
 // core.js
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-export { THREE }; // <-- garante que o mobile.js e o vr.js consigam usar o mesmo THREE
+// ⚠️ Observe o "?module" no final do endereço
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js?module';
+export { THREE }; // agora mobile.js e vr.js conseguem usar exatamente a mesma URL
 
 export let scene, camera, renderer;
 export let lastMediaURL = null;
