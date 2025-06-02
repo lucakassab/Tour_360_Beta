@@ -1,5 +1,4 @@
 // mobile.js
-// Importa o THREE, mas como o core.js já carregou com ?module, sobra tudo certinho
 import { THREE, initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
 
 let isDragging = false;
@@ -16,7 +15,7 @@ export function initialize() {
       startX = e.touches[0].pageX;
       startY = e.touches[0].pageY;
     }
-  }, false);
+  });
 
   renderer.domElement.addEventListener('touchmove', e => {
     if (isDragging && e.touches.length === 1) {
@@ -27,11 +26,9 @@ export function initialize() {
       startX = e.touches[0].pageX;
       startY = e.touches[0].pageY;
     }
-  }, false);
+  });
 
-  renderer.domElement.addEventListener('touchend', () => {
-    isDragging = false;
-  }, false);
+  renderer.domElement.addEventListener('touchend', () => { isDragging = false; });
 
   animate();
 }

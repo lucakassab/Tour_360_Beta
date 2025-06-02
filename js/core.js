@@ -1,7 +1,7 @@
 // core.js
-// ⚠️ Observe o "?module" no final do endereço
+// PEGA Three.js UMA ÚNICA VEZ — usa o MESMO URL que o OrbitControls/VRButton resolvem internamente
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js?module';
-export { THREE }; // agora mobile.js e vr.js conseguem usar exatamente a mesma URL
+export { THREE };   // reexporta pra geral
 
 export let scene, camera, renderer;
 export let lastMediaURL = null;
@@ -24,13 +24,14 @@ export function initializeCore() {
   renderer.setPixelRatio(devicePixelRatio);
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+
   window.addEventListener('resize', () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  // — HUD “Loading…”
+  /* ---------- HUD “Loading…” ---------- */
   loadingCanvas = document.createElement('canvas');
   loadingCanvas.width = 512;
   loadingCanvas.height = 128;
@@ -49,7 +50,7 @@ export function initializeCore() {
   loadingMesh.visible = false;
   scene.add(loadingMesh);
 
-  // — HUD “Botão pressionado”
+  /* ---------- HUD “Button” ---------- */
   buttonCanvas = document.createElement('canvas');
   buttonCanvas.width = 512;
   buttonCanvas.height = 128;
@@ -69,8 +70,8 @@ export function initializeCore() {
   scene.add(buttonHUDMesh);
 }
 
-export function showLoading()  { loadingMesh.visible = true;  }
-export function hideLoading()  { loadingMesh.visible = false; }
+export const showLoading  = () => (loadingMesh.visible = true);
+export const hideLoading  = () => (loadingMesh.visible = false);
 
 export function updateHUDPositions() {
   const dir = new THREE.Vector3();
@@ -100,11 +101,11 @@ export function showButtonHUD(txt) {
   buttonTexture.needsUpdate = true;
   buttonHUDMesh.visible = true;
   clearTimeout(buttonTimeout);
-  buttonTimeout = setTimeout(() => buttonHUDMesh.visible = false, 2000);
+  buttonTimeout = setTimeout(() => (buttonHUDMesh.visible = false), 2000);
 }
 
 export async function loadMediaInSphere(url, isStereo) {
-  lastMediaURL = url;
+  lastMediaURL    = url;
   lastMediaStereo = isStereo;
 
   showLoading();
@@ -121,33 +122,26 @@ export async function loadMediaInSphere(url, isStereo) {
     currentMesh = null;
   }
 
-  const geo = new THREE.SphereGeometry(500, 60, 40);
-  geo.scale(-1, 1, 1);
-
+  const geo = new THREE.SphereGeometry(500, 60, 40).scale(-1, 1, 1);
   const ext = url.split('.').pop().toLowerCase();
   let tex;
 
   if (['mp4', 'webm', 'mov'].includes(ext)) {
     const vid = document.createElement('video');
-    vid.src = url;
-    vid.crossOrigin = 'anonymous';
-    vid.loop = true;
-    vid.muted = true;
-    vid.playsInline = true;
+    vid.src           = url;
+    vid.crossOrigin   = 'anonymous';
+    vid.loop          = true;
+    vid.muted         = true;
+    vid.playsInline   = true;
     try { await vid.play().catch(() => {}); } catch {}
     tex = new THREE.VideoTexture(vid);
-    tex.colorSpace = THREE.SRGBColorSpace;
   } else {
     const loader = new THREE.TextureLoader();
     tex = await new Promise((ok, err) =>
-      loader.load(
-        url,
-        (t) => { t.colorSpace = THREE.SRGBColorSpace; ok(t); },
-        undefined,
-        err
-      )
+      loader.load(url, (t) => ok(t), undefined, err)
     );
   }
+  tex.colorSpace = THREE.SRGBColorSpace;
 
   if (isStereo && !renderer.xr.isPresenting) {
     const mat = new THREE.MeshBasicMaterial({ map: tex });
@@ -161,21 +155,23 @@ export async function loadMediaInSphere(url, isStereo) {
     matL.map.repeat.set(1, 0.5);
     matL.map.offset.set(0, 0.5);
     matL.map.needsUpdate = true;
-    const meshL = new THREE.Mesh(geo.clone(), matL);
-    meshL.layers.set(1);
 
     const matR = new THREE.MeshBasicMaterial({ map: tex.clone() });
     matR.map.repeat.set(1, 0.5);
     matR.map.offset.set(0, 0);
     matR.map.needsUpdate = true;
-    const meshR = new THREE.Mesh(geo.clone(), matR);
-    meshR.layers.set(2);
+
+    const meshL = new THREE.Mesh(geo.clone(), matL); meshL.layers.set(1);
+    const meshR = new THREE.Mesh(geo.clone(), matR); meshR.layers.set(2);
 
     currentMesh = new THREE.Group();
     currentMesh.add(meshL, meshR);
 
   } else {
-    currentMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
+    currentMesh = new THREE.Mesh(
+      geo,
+      new THREE.MeshBasicMaterial({ map: tex })
+    );
   }
 
   scene.add(currentMesh);

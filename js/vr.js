@@ -1,5 +1,4 @@
 // vr.js
-// Mesma ideia: import VRButton com ?module e o THREE vem do core.js
 import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js?module';
 import {
   THREE,
@@ -15,104 +14,59 @@ import {
 
 export let onEnterXR = null;
 
-const BUTTON_LABEL = {
-  0: 'Trigger',
-  1: 'Grip',
-  3: 'Thumb',
-  4: 'A',
-  5: 'B'
-};
+const LABEL = { 4: 'A', 5: 'B' };
+let canRotateL = true, canRotateR = true;
 
-let canRotateLeft = true;
-let canRotateRight = true;
-
-function changeMediaInSelect(delta) {
-  const select = document.getElementById('mediaSelect');
-  const len = select.options.length;
-  if (!len) return;
-
-  let idx = parseInt(select.value);
-  idx = (idx + delta + len) % len;
-  select.value = idx;
-
-  const opt = select.options[idx];
-  const url    = opt.getAttribute('data-url');
-  const stereo = opt.getAttribute('data-stereo') === 'true';
-
-  loadMediaInSphere(url, stereo);
+function change(delta) {
+  const sel = document.getElementById('mediaSelect');
+  if (!sel.options.length) return;
+  let i = (+sel.value + delta + sel.options.length) % sel.options.length;
+  sel.value = i;
+  loadMediaInSphere(
+    sel.options[i].getAttribute('data-url'),
+    sel.options[i].getAttribute('data-stereo') === 'true'
+  );
 }
 
-function rotateScene(angleDeg) {
-  const angleRad = THREE.MathUtils.degToRad(angleDeg);
-  scene.rotation.y += angleRad;
-}
+function rotateScene(deg) { scene.rotation.y += THREE.MathUtils.degToRad(deg); }
 
 export function initialize() {
   if (renderer.xr.enabled) return;
   renderer.xr.enabled = true;
-
   document.body.appendChild(VRButton.createButton(renderer));
 
   renderer.xr.addEventListener('sessionstart', () => {
-    if (typeof onEnterXR === 'function') onEnterXR();
-    if (lastMediaURL) {
-      loadMediaInSphere(lastMediaURL, lastMediaStereo);
-    }
+    onEnterXR?.();
+    if (lastMediaURL) loadMediaInSphere(lastMediaURL, lastMediaStereo);
   });
 
   renderer.setAnimationLoop(loop);
 }
 
 function loop() {
-  const session = renderer.xr.getSession();
-  if (session) {
-    session.inputSources.forEach(source => {
-      if (!source.gamepad) return;
-      const gp = source.gamepad;
+  const s = renderer.xr.getSession();
+  if (s) {
+    s.inputSources.forEach(src => {
+      const gp = src.gamepad;
+      if (!gp) return;
 
-      // Botão A (4) → anterior
-      if (gp.buttons[4]?.pressed) {
-        showButtonHUD(BUTTON_LABEL[4]);
-        changeMediaInSelect(-1);
-      }
-      // Botão B (5) → próximo
-      if (gp.buttons[5]?.pressed) {
-        showButtonHUD(BUTTON_LABEL[5]);
-        changeMediaInSelect(+1);
-      }
+      if (gp.buttons[4]?.pressed) { showButtonHUD(LABEL[4]); change(-1); }
+      if (gp.buttons[5]?.pressed) { showButtonHUD(LABEL[5]); change(+1); }
 
-      // Eixo horizontal do stick
-      const axisH = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
-      if (axisH > 0.5 && canRotateRight) {
-        rotateScene(-20);
-        canRotateRight = false;
-        canRotateLeft  = true;
-      }
-      if (axisH < -0.5 && canRotateLeft) {
-        rotateScene(+20);
-        canRotateLeft = false;
-        canRotateRight = true;
-      }
-      if (axisH >= -0.5 && axisH <= 0.5) {
-        canRotateLeft = true;
-        canRotateRight = true;
-      }
+      const ax = gp.axes[2] ?? gp.axes[0];
+      if (ax > 0.5 && canRotateR) { rotateScene(-20); canRotateR = false; }
+      if (ax < -0.5 && canRotateL) { rotateScene(+20); canRotateL = false; }
+      if (Math.abs(ax) <= 0.5) { canRotateL = canRotateR = true; }
     });
   }
-
   updateHUDPositions();
   renderer.render(scene, camera);
 }
 
 export function loadMedia(url, stereo) {
-  if (stereo) {
-    camera.layers.enable(1);
-    camera.layers.enable(2);
-    camera.layers.disable(0);
-  } else {
-    camera.layers.enable(0);
-    camera.layers.disable(1);
-    camera.layers.disable(2);
-  }
+  camera.layers.enable(stereo ? 1 : 0);
+  camera.layers.enable(stereo ? 2 : 0);
+  camera.layers.disable(stereo ? 0 : 1);
+  camera.layers.disable(stereo ? 0 : 2);
   loadMediaInSphere(url, stereo);
 }
