@@ -1,4 +1,4 @@
-// loader.js (mantém como está)
+// loader.js
 (async () => {
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   const canVR    = navigator.xr && await navigator.xr.isSessionSupported?.('immersive-vr');
@@ -11,7 +11,6 @@
     vrModule.initialize();
     vrModule.onEnterXR = () => {
       mediaModule = vrModule;
-
       if (vrModule.lastMediaURL) {
         vrModule.loadMedia(vrModule.lastMediaURL, vrModule.lastMediaStereo);
       }
@@ -44,7 +43,6 @@
     const opt = document.createElement('option');
     opt.value = i;
     opt.textContent = m.name;
-
     opt.setAttribute('data-url', m.url);
     opt.setAttribute('data-stereo', m.stereo ? 'true' : 'false');
     select.appendChild(opt);
@@ -61,8 +59,8 @@
 
   if (mediaList.length) {
     const primeiro = select.options[0];
-    const url0    = primeiro.getAttribute('data-url');
-    const stereo0 = primeiro.getAttribute('data-stereo') === 'true';
+    const url0     = primeiro.getAttribute('data-url');
+    const stereo0  = primeiro.getAttribute('data-stereo') === 'true';
     mediaModule.loadMedia(url0, stereo0);
   }
 })();

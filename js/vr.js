@@ -22,13 +22,13 @@ const BUTTON_LABEL = {
   5: 'B'
 };
 
-let canRotateLeft  = true;
+let canRotateLeft = true;
 let canRotateRight = true;
 
 function changeMediaInSelect(delta) {
   const select = document.getElementById('mediaSelect');
   const len = select.options.length;
-  if (!len) return;
+  if (len === 0) return;
 
   let idx = parseInt(select.value);
   idx = (idx + delta + len) % len;
@@ -66,36 +66,33 @@ export function initialize() {
 function loop() {
   const session = renderer.xr.getSession();
   if (session) {
-    session.inputSources.forEach((source) => {
+    session.inputSources.forEach(source => {
       if (!source.gamepad) return;
       const gp = source.gamepad;
 
-      // Botão “A” (índice 4) vai pra mídia anterior
+      // Botão A (índice 4) → mídia anterior
       if (gp.buttons[4]?.pressed) {
         showButtonHUD(BUTTON_LABEL[4]);
         changeMediaInSelect(-1);
       }
-      // Botão “B” (índice 5) vai pra próxima mídia
+      // Botão B (índice 5) → próxima mídia
       if (gp.buttons[5]?.pressed) {
         showButtonHUD(BUTTON_LABEL[5]);
         changeMediaInSelect(+1);
       }
 
-      // Pega o eixo horizontal do analógico (eixos[2] ou eixos[0])
+      // Eixo horizontal do analógico pra rotação suave
       const axisH = gp.axes[2] !== undefined ? gp.axes[2] : gp.axes[0];
-
       if (axisH > 0.5 && canRotateRight) {
         rotateScene(-20);
         canRotateRight = false;
         canRotateLeft  = true;
       }
-
       if (axisH < -0.5 && canRotateLeft) {
         rotateScene(+20);
         canRotateLeft = false;
         canRotateRight = true;
       }
-
       if (axisH >= -0.5 && axisH <= 0.5) {
         canRotateLeft = true;
         canRotateRight = true;
