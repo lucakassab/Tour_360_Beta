@@ -1,7 +1,7 @@
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
 
 export let scene, camera, renderer;
-// Armazenam a última mídia carregada para reuso no VR
+
 export let lastMediaURL = null;
 export let lastMediaStereo = false;
 
@@ -28,7 +28,7 @@ export function initializeCore() {
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  /* HUD Loading */
+  
   loadingCanvas = document.createElement('canvas');
   loadingCanvas.width = 512; loadingCanvas.height = 128;
   const ctxL = loadingCanvas.getContext('2d');
@@ -46,7 +46,7 @@ export function initializeCore() {
   loadingMesh.visible = false;
   scene.add(loadingMesh);
 
-  /* HUD Botão */
+  
   buttonCanvas = document.createElement('canvas');
   buttonCanvas.width = 512; buttonCanvas.height = 128;
   const ctxB = buttonCanvas.getContext('2d');
@@ -100,7 +100,7 @@ export function showButtonHUD(txt) {
 }
 
 export async function loadMediaInSphere(url, isStereo) {
-  // Armazena globalmente pra podermos recarregar no VR
+  
   lastMediaURL = url;
   lastMediaStereo = isStereo;
 
@@ -146,9 +146,9 @@ export async function loadMediaInSphere(url, isStereo) {
     );
   }
 
-  // Decide entre 2D ou VR de verdade (isPresenting só true durante a sessão XR)
+  
   if (isStereo && !renderer.xr.isPresenting) {
-    // modo 2D: exibe só metade superior (top-half)
+    
     const mat = new THREE.MeshBasicMaterial({ map: tex });
     mat.map.repeat.set(1, 0.5);
     mat.map.offset.set(0, 0.5);
@@ -156,7 +156,7 @@ export async function loadMediaInSphere(url, isStereo) {
     currentMesh = new THREE.Mesh(geo, mat);
 
   } else if (isStereo && renderer.xr.isPresenting) {
-    // modo VR: cria duas esferas (layer 1 = olho esquerdo, layer 2 = olho direito)
+    
     const matL = new THREE.MeshBasicMaterial({ map: tex.clone() });
     matL.map.repeat.set(1, 0.5);
     matL.map.offset.set(0, 0.5);
@@ -175,7 +175,7 @@ export async function loadMediaInSphere(url, isStereo) {
     currentMesh.add(meshL, meshR);
 
   } else {
-    // mono ou fallback
+    
     currentMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
   }
 

@@ -8,7 +8,7 @@ export function initialize() {
   initializeCore();
   document.body.appendChild(renderer.domElement);
 
-  camera.position.set(0, 0, 0.1);  // afasta a câmera do centro
+  camera.position.set(0, 0, 0.1);  
 
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan   = false;
