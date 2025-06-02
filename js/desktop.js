@@ -25,6 +25,4 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-export function loadMedia(url, stereo) {
-  loadMediaInSphere(url, stereo);
-}
+export const loadMedia = loadMediaInSphere; // reexport simples

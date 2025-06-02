@@ -1,34 +1,36 @@
 // mobile.js
 import { THREE, initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
 
-let isDragging = false;
-let startX = 0, startY = 0;
+let dragging = false;
+let sx = 0, sy = 0;
 let lon = 0, lat = 0;
 
 export function initialize() {
   initializeCore();
   document.body.appendChild(renderer.domElement);
 
-  renderer.domElement.addEventListener('touchstart', e => {
+  const cvs = renderer.domElement;
+
+  cvs.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1) {
-      isDragging = true;
-      startX = e.touches[0].pageX;
-      startY = e.touches[0].pageY;
+      dragging = true;
+      sx = e.touches[0].pageX;
+      sy = e.touches[0].pageY;
     }
   });
 
-  renderer.domElement.addEventListener('touchmove', e => {
-    if (isDragging && e.touches.length === 1) {
-      const dx = e.touches[0].pageX - startX;
-      const dy = e.touches[0].pageY - startY;
+  cvs.addEventListener('touchmove', (e) => {
+    if (dragging && e.touches.length === 1) {
+      const dx = e.touches[0].pageX - sx;
+      const dy = e.touches[0].pageY - sy;
       lon -= dx * 0.1;
       lat += dy * 0.1;
-      startX = e.touches[0].pageX;
-      startY = e.touches[0].pageY;
+      sx = e.touches[0].pageX;
+      sy = e.touches[0].pageY;
     }
   });
 
-  renderer.domElement.addEventListener('touchend', () => { isDragging = false; });
+  cvs.addEventListener('touchend', () => { dragging = false; });
 
   animate();
 }
@@ -36,18 +38,16 @@ export function initialize() {
 function animate() {
   requestAnimationFrame(animate);
   lat = Math.max(-85, Math.min(85, lat));
-  const phi = THREE.MathUtils.degToRad(90 - lat);
+  const phi   = THREE.MathUtils.degToRad(90 - lat);
   const theta = THREE.MathUtils.degToRad(lon);
-  const target = new THREE.Vector3(
+  const tgt = new THREE.Vector3(
     Math.sin(phi) * Math.cos(theta),
     Math.cos(phi),
     Math.sin(phi) * Math.sin(theta)
   );
-  camera.lookAt(target);
+  camera.lookAt(tgt);
   updateHUDPositions();
   renderer.render(scene, camera);
 }
 
-export function loadMedia(url, isStereo) {
-  loadMediaInSphere(url, isStereo);
-}
+export const loadMedia = loadMediaInSphere;
