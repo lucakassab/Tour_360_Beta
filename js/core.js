@@ -187,7 +187,7 @@ export async function loadMediaInSphere(url, isStereo) {
   const geo = new THREE.SphereGeometry(500, SEG_W, SEG_H).scale(-1, 1, 1);
 
   const ext = url.split('.').pop().toLowerCase();
-  let tex, frameId, vid;
+  let tex, vid;
 
   try {
     if (['mp4', 'webm', 'mov'].includes(ext)) {
@@ -199,20 +199,19 @@ export async function loadMediaInSphere(url, isStereo) {
       vid.playsInline = true;
       try { await vid.play().catch(() => {}); } catch {}
 
-      // Cria uma VideoTexture “base” (mas não vamos usar diretamente em mono)
+      // Cria uma VideoTexture “base”
       tex = new THREE.VideoTexture(vid);
       tex.minFilter = THREE.LinearFilter;
       tex.magFilter = THREE.LinearFilter;
       tex.generateMipmaps = false;
       tex.colorSpace = THREE.SRGBColorSpace;
-      // Guarda referência pro vídeo e pro frame callback
+      // Guarda referência pro vídeo e pra callback
       tex._video    = vid;
       tex._frameId  = null;
 
       // Função de atualização de textura
       const updateTex = () => {
         tex.needsUpdate = true;
-        // Agenda próxima chamada
         tex._frameId = vid.requestVideoFrameCallback(updateTex);
       };
       // Primeira chamada
@@ -233,13 +232,13 @@ export async function loadMediaInSphere(url, isStereo) {
     return;
   }
 
-  // Constrói o mesh de acordo com mono/estéreo + XR
+  // Constrói o mesh de acordo com mono/estéreo + VR
   let meshToAdd;
   const inXR = renderer.xr.isPresenting;
 
+  // 1) VÍDEO ESTÉREO NO VR
   if (['mp4', 'webm', 'mov'].includes(ext) && isStereo && inXR) {
-    // ESTÉREO NO VR: precisamos de 2 materiais com offsets diferentes,
-    // mas vamos usar a mesma video element (apenas 1 play), pois clones não herdam o loop de atualização
+    // Usamos o mesmo <video> para duas VideoTextures (esquerda e direita)
     const texL = new THREE.VideoTexture(vid);
     texL.minFilter = THREE.LinearFilter;
     texL.magFilter = THREE.LinearFilter;
@@ -256,7 +255,7 @@ export async function loadMediaInSphere(url, isStereo) {
     texR._video   = vid;
     texR._frameId = null;
 
-    // Agenda updates pros dois ao mesmo tempo
+    // Agenda updates para ambas texturas
     const updateStereo = () => {
       texL.needsUpdate = true;
       texR.needsUpdate = true;
@@ -274,6 +273,7 @@ export async function loadMediaInSphere(url, isStereo) {
     texL.offset.set(0, 0.5);
     texL.needsUpdate = true;
     const matL = new THREE.MeshBasicMaterial({ map: texL });
+
     // Material direito (metade inferior do vídeo)
     texR.repeat.set(1, 0.5);
     texR.offset.set(0, 0);
@@ -288,27 +288,47 @@ export async function loadMediaInSphere(url, isStereo) {
     meshToAdd = new THREE.Group();
     meshToAdd.add(meshL, meshR);
 
+  // 2) VÍDEO MONO (desktop ou mobile ou VR sem estéreo)
   } else if (['mp4', 'webm', 'mov'].includes(ext) && (!isStereo || !inXR)) {
-    // VÍDEO MONO (desktop ou mobile ou VR sem estéreo)
     tex.repeat.set(1, 1);
     tex.offset.set(0, 0);
     tex.needsUpdate = true;
     meshToAdd = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ map: tex }));
+
+  // 3) IMAGEM ESTÉREO FORA DO VR (top-half)
   } else if (!['mp4', 'webm', 'mov'].includes(ext) && isStereo && !inXR) {
-    // IMAGEM ESTÉREO NO DESKTOP/MOBILE: (metade superior)
     const mat = new THREE.MeshBasicMaterial({ map: tex });
     mat.map.repeat.set(1, 0.5);
     mat.map.offset.set(0, 0.5);
     mat.map.needsUpdate = true;
     meshToAdd = new THREE.Mesh(geo, mat);
-  } else if (!['mp4', 'webm', 'mov'].includes(ext)) {
-    // IMAGEM MONO (desktop/mobile/VR sem estéreo)
-    meshToAdd = new THREE.Mesh(
-      geo,
-      new THREE.MeshBasicMaterial({ map: tex })
-    );
+
+  // 4) IMAGEM ESTÉREO NO VR (split left/right)
+  } else if (!['mp4', 'webm', 'mov'].includes(ext) && isStereo && inXR) {
+    // Clona a textura original para não mexer no repeat/ofs do original
+    const texL = tex.clone();
+    texL.repeat.set(1, 0.5);
+    texL.offset.set(0, 0.5);
+    texL.needsUpdate = true;
+
+    const texR = tex.clone();
+    texR.repeat.set(1, 0.5);
+    texR.offset.set(0, 0);
+    texR.needsUpdate = true;
+
+    const matL = new THREE.MeshBasicMaterial({ map: texL });
+    const matR = new THREE.MeshBasicMaterial({ map: texR });
+
+    const meshL = new THREE.Mesh(geo.clone(), matL);
+    meshL.layers.set(1);
+    const meshR = new THREE.Mesh(geo.clone(), matR);
+    meshR.layers.set(2);
+
+    meshToAdd = new THREE.Group();
+    meshToAdd.add(meshL, meshR);
+
+  // 5) IMAGEM MONO (desktop, mobile ou VR sem estéreo)
   } else {
-    // Caso não preveja aqui, cai nesse else (só por segurança)
     meshToAdd = new THREE.Mesh(
       geo,
       new THREE.MeshBasicMaterial({ map: tex })
