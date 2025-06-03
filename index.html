@@ -1,16 +1,95 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Teu Tour Virtual</title>
+  <meta charset="utf-8" />
+  <title>Tour360 – Visualizador 360°</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- Favicon (Vai buscar em "icons/favicon.ico" relativo à pasta do projeto) -->
   <link rel="icon" href="icons/favicon.ico" type="image/x-icon">
+
+  <!-- Ícone pra iOS (180×180) -->
   <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+
+  <!-- Manifest JSON -->
   <link rel="manifest" href="manifest.json">
+
   <!-- Cor da barra no Android -->
   <meta name="theme-color" content="#000000" />
+
+  <style>
+    body { 
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      font-family: sans-serif;
+    }
+    html, body {
+      overscroll-behavior: none;
+      touch-action: none;
+    }
+    canvas {
+      touch-action: none;
+    }
+    #menu {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 999;
+      background: rgba(0,0,0,0.5);
+      color: #fff;
+      padding: 8px;
+      border-radius: 6px;
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    #menu label, #menu select, #menu button {
+      display: block;
+      font-size: 14px;
+      color: #fff;
+    }
+    #mediaSelect {
+      padding: 6px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      min-width: 150px;
+      background: #222;
+      color: #fff;
+    }
+    #prevBtn, #nextBtn {
+      padding: 6px 10px;
+      font-size: 14px;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      background: #007bff;
+      color: #fff;
+    }
+    #prevBtn:hover, #nextBtn:hover {
+      background: #0056b3;
+    }
+  </style>
 </head>
 <body>
-  <!-- resto do teu código -->
+  <div id="menu">
+    <label for="mediaSelect">Mídia:</label>
+    <select id="mediaSelect"></select>
+    <button id="prevBtn">Anterior</button>
+    <button id="nextBtn">Próximo</button>
+  </div>
+
+  <!-- importmap para resolver 'three' nos módulos -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.158.0/build/three.module.js"
+    }
+  }
+  </script>
+
+  <!-- Carrega o loader principal, que escolhe entre desktop.js ou mobile.js -->
+  <script type="module" src="js/loader.js"></script>
 </body>
 </html>
