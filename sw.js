@@ -1,55 +1,42 @@
-// sw.js – Service Worker para cache offline
-
-// ↕ Mude esse nome SEMPRE que acrescentar/remover arquivos pra forçar refresh
-const CACHE_NAME = "tour360-v1";
-
-// Liste TUDO que você quer pré-cachear
-// Caminho RELATIVO à raiz do GitHub Pages (sem barra inicial)
-const ASSETS = [
+// sw.js – cache-first genérico; mídias são adicionadas dinamicamente pelo loader.js
+const CACHE_CORE  = "tour360-core-v1";
+const CORE_FILES  = [
   "index.html",
   "manifest.json",
-
-  /*------  ÍCONES  ------*/
   "icons/favicon.ico",
   "icons/apple-touch-icon.png",
   "icons/icon-192x192.png",
   "icons/icon-512x512.png",
-
-  /*------  JS  ------*/
   "js/loader.js",
   "js/core.js",
   "js/desktop.js",
   "js/mobile.js",
-  "js/vr.js",
-
-  /*------  MÍDIAS  ------*/
-  "media/pic1.jpg",
-  "media/pic2.jpg",
-  "media/vid1.mp4"
+  "js/vr.js"
 ];
 
-// Instala e coloca tudo no cache uma ÚNICA vez
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
+// Instalamos apenas os arquivos essenciais (não inclui mídias)
+self.addEventListener("install", evt => {
+  evt.waitUntil(
+    caches.open(CACHE_CORE).then(c => c.addAll(CORE_FILES))
   );
-  self.skipWaiting(); // força ativação imediata
+  self.skipWaiting();
 });
 
-// Depois de instalado, serve do cache; se não achar, faz fetch normal
-self.addEventListener("fetch", (event) => {
-  event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
-  );
-});
-
-// Se você trocar CACHE_NAME, o activate remove o cache velho
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.map((k) => (k === CACHE_NAME ? null : caches.delete(k)))
-      )
+// Cache-first: tenta cache, senão rede
+self.addEventListener("fetch", evt => {
+  evt.respondWith(
+    caches.match(evt.request).then(
+      resp => resp || fetch(evt.request)
     )
   );
+});
+
+// Limpa caches antigos se o nome mudar
+self.addEventListener("activate", evt => {
+  evt.waitUntil(
+    caches.keys().then(keys =>
+      Promise.all(keys.map(k => (k === CACHE_CORE || k === "tour360-media-v1") ? null : caches.delete(k)))
+    )
+  );
+  self.clients.claim();
 });

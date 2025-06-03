@@ -1,80 +1,124 @@
 // js/loader.js
 //
-// Agora usa caminho RELATIVO (“media/…”) em vez de f.download_url
-// → funciona offline porque o Service Worker intercepta pedidos da mesma origem.
+// Fluxo:
+// 1. Abre o cache “tour360-media-v1”.
+// 2. Se já existir pelo menos 1 arquivo em media/* no cache → usa offline direto.
+// 3. Caso contrário, (1ª visita online) usa a GitHub API para listar a pasta
+//    /media, baixa cada arquivo, guarda no cache e só então monta a UI.
+// 4. Toda navegação (select / botões) usa sempre o mesmo caminho relativo
+//    “media/arquivo.ext”, que será servido do cache quando offline.
 
 (async () => {
-  /* 1) Inicializa módulo mobile ou desktop */
-  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  let mediaModule = await import(isMobile ? './mobile.js' : './desktop.js');
+  /* ---------- CONFIG ---------- */
+  const CACHE_MEDIA = "tour360-media-v1";
+  const GITHUB_API  = "https://api.github.com/repos/lucakassab/tour_360_beta/contents/media";
+  const EXT         = [".jpg", ".png", ".mp4", ".webm", ".mov"];
+
+  /* ---------- Inicializa módulo desktop / mobile ---------- */
+  const isMobile   = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  let   mediaModule = await import(isMobile ? "./mobile.js" : "./desktop.js");
   mediaModule.initialize();
 
-  /* 2) Busca lista de arquivos na pasta /media do GitHub */
-  const GITHUB_API = 'https://api.github.com/repos/lucakassab/tour_360_beta/contents/media';
-  const EXT        = ['.jpg', '.png', '.mp4', '.webm', '.mov'];
-  let mediaList    = [];
+  /* ---------- Funções utilitárias ---------- */
+  const openMediaCache = () => caches.open(CACHE_MEDIA);
 
-  try {
-    const resp = await fetch(GITHUB_API);
-    if (resp.ok) {
-      const arr = await resp.json();
-      mediaList = arr
-        .filter(f => EXT.some(ext => f.name.toLowerCase().endsWith(ext)))
-        .map(f => ({
-          name:   f.name,
-          url:    `media/${f.name}`,          // <<< caminho relativo!
-          stereo: f.name.toLowerCase().includes('_stereo')
-        }));
-    } else {
-      console.error('Falha ao buscar mídias:', resp.status);
-    }
-  } catch (e) {
-    console.error('Erro ao buscar mídias:', e);
+  async function listCachedMedia() {
+    const cache = await openMediaCache();
+    const keys  = await cache.keys();
+    return keys
+      .filter(req => req.url.includes("/media/"))
+      .map(req  => {
+        const name = req.url.split("/").pop();
+        return {
+          name,
+          url:  `media/${name}`,
+          stereo: name.toLowerCase().includes("_stereo")
+        };
+      });
   }
 
-  /* 3) Preenche o <select> com a lista */
-  const select = document.getElementById('mediaSelect');
+  async function downloadAndCacheAll() {
+    const resp = await fetch(GITHUB_API);
+    if (!resp.ok) throw new Error("GitHub API falhou: " + resp.status);
+    const arr  = await resp.json();
+
+    const mediaFromApi = arr
+      .filter(f => EXT.some(ext => f.name.toLowerCase().endsWith(ext)))
+      .map(f => ({
+        name:   f.name,
+        url:    `media/${f.name}`, // sempre mesmo-origin
+        stereo: f.name.toLowerCase().includes("_stereo")
+      }));
+
+    const cache = await openMediaCache();
+    let   done  = 0;
+    for (const m of mediaFromApi) {
+      try {
+        const r = await fetch(m.url, { cache: "no-cache" }); // força baixar 1ª vez
+        if (r.ok) await cache.put(m.url, r.clone());
+        else console.warn("Não baixou:", m.url, r.status);
+      } catch (e) {
+        console.warn("Falhou baixar:", m.url, e);
+      }
+      console.log(`Pré-cache ${(++done)}/${mediaFromApi.length}:`, m.name);
+    }
+    return mediaFromApi;
+  }
+
+  /* ---------- Obtém a lista final (cache ou rede) ---------- */
+  let mediaList = await listCachedMedia();
+
+  if (mediaList.length === 0) {
+    if (!navigator.onLine) {
+      alert("Sem mídias no cache e você está offline. Volte quando tiver internet 😊");
+      return;
+    }
+    try {
+      mediaList = await downloadAndCacheAll();
+    } catch (e) {
+      console.error("Não deu pra baixar mídias:", e);
+      alert("Falha ao baixar mídias. Veja o console.");
+      return;
+    }
+  }
+
+  /* ---------- Preenche UI ---------- */
+  const select = document.getElementById("mediaSelect");
   mediaList.forEach((m, i) => {
-    const opt = document.createElement('option');
-    opt.value   = i;
-    opt.textContent     = m.name;
-    opt.dataset.url     = m.url;
-    opt.dataset.stereo  = m.stereo ? 'true' : 'false';
+    const opt = document.createElement("option");
+    opt.value         = i;
+    opt.textContent   = m.name;
+    opt.dataset.url   = m.url;
+    opt.dataset.stereo= m.stereo ? "true" : "false";
     select.appendChild(opt);
   });
 
-  /* 4) Carrega mídia quando o select muda */
-  select.addEventListener('change', () => {
+  /* change → load */
+  select.addEventListener("change", () => {
     const opt = select.selectedOptions[0];
-    if (!opt) return;
-    mediaModule.loadMedia(opt.dataset.url, opt.dataset.stereo === 'true');
+    if (opt) mediaModule.loadMedia(opt.dataset.url, opt.dataset.stereo === "true");
   });
 
-  /* 5) Botões Anterior / Próximo */
-  document.getElementById('prevBtn').addEventListener('click', () => {
+  /* Botões Prev / Next */
+  const step = delta => {
     if (!select.options.length) return;
-    let idx = (parseInt(select.value) - 1 + select.options.length) % select.options.length;
+    let idx = (parseInt(select.value) + delta + select.options.length) % select.options.length;
     select.value = idx;
-    select.dispatchEvent(new Event('change'));
-  });
+    select.dispatchEvent(new Event("change"));
+  };
+  document.getElementById("prevBtn").onclick = () => step(-1);
+  document.getElementById("nextBtn").onclick = () => step(+1);
 
-  document.getElementById('nextBtn').addEventListener('click', () => {
-    if (!select.options.length) return;
-    let idx = (parseInt(select.value) + 1) % select.options.length;
-    select.value = idx;
-    select.dispatchEvent(new Event('change'));
-  });
-
-  /* 6) Carrega a primeira mídia automaticamente */
+  /* Carrega a primeira mídia */
   if (mediaList.length) {
     select.value = 0;
-    select.dispatchEvent(new Event('change'));
+    select.dispatchEvent(new Event("change"));
   }
 
-  /* 7) Tenta habilitar VR */
-  if (navigator.xr && await navigator.xr.isSessionSupported?.('immersive-vr')) {
+  /* ---------- VR (opcional) ---------- */
+  if (navigator.xr && await navigator.xr.isSessionSupported?.("immersive-vr")) {
     try {
-      const vrModule = await import('./vr.js');
+      const vrModule = await import("./vr.js");
       vrModule.initialize();
       vrModule.onEnterXR = () => {
         mediaModule = vrModule;
@@ -83,7 +127,7 @@
         }
       };
     } catch (e) {
-      console.warn('Módulo VR não pôde ser carregado:', e);
+      console.warn("VR não disponível:", e);
     }
   }
 })();
