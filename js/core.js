@@ -1,15 +1,18 @@
 // core.js
 
-// 1) Importa a instância única de Three.js (sem ?module, para bater com o que o importmap espera)
+// 1) Importa a instância única de Three.js
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-// 2) Importa o OrbitControls (ele mesmo internamente faz `import from 'three'`, mas agora será redirecionado pelo importmap)
+// 2) Importa o OrbitControls
 import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
-// 3) Exporta tudo
+// 3) Exporta pra geral
 export { THREE, OrbitControls };
 
 export let scene, camera, renderer;
 export let lastMediaURL    = null;
 export let lastMediaStereo = false;
+
+// --- token pra cancelar carregamentos antigos ----
+let loadToken = 0;
 
 let currentMesh    = null;
 let loadingMesh    = null;
@@ -112,8 +115,12 @@ export async function loadMediaInSphere(url, isStereo) {
   lastMediaURL    = url;
   lastMediaStereo = isStereo;
 
+  // gera token único pra este load
+  const myToken = ++loadToken;
+
   showLoading();
 
+  // limpa mesh anterior (se existir)
   if (currentMesh) {
     scene.remove(currentMesh);
     currentMesh.traverse((n) => {
@@ -126,33 +133,42 @@ export async function loadMediaInSphere(url, isStereo) {
     currentMesh = null;
   }
 
+  // prepara esfera e textura
   const geo = new THREE.SphereGeometry(500, 60, 40).scale(-1, 1, 1);
   const ext = url.split('.').pop().toLowerCase();
   let tex;
 
-  if (['mp4', 'webm', 'mov'].includes(ext)) {
-    const vid = document.createElement('video');
-    vid.src         = url;
-    vid.crossOrigin = 'anonymous';
-    vid.loop        = true;
-    vid.muted       = true;
-    vid.playsInline = true;
-    try { await vid.play().catch(() => {}); } catch {}
-    tex = new THREE.VideoTexture(vid);
-  } else {
-    const loader = new THREE.TextureLoader();
-    tex = await new Promise((ok, err) =>
-      loader.load(url, (t) => ok(t), undefined, err)
-    );
+  try {
+    if (['mp4', 'webm', 'mov'].includes(ext)) {
+      const vid = document.createElement('video');
+      vid.src         = url;
+      vid.crossOrigin = 'anonymous';
+      vid.loop        = true;
+      vid.muted       = true;
+      vid.playsInline = true;
+      try { await vid.play().catch(() => {}); } catch {}
+      tex = new THREE.VideoTexture(vid);
+    } else {
+      const loader = new THREE.TextureLoader();
+      tex = await new Promise((ok, err) =>
+        loader.load(url, (t) => ok(t), undefined, err)
+      );
+    }
+    tex.colorSpace = THREE.SRGBColorSpace;
+  } catch (e) {
+    console.error('Falha ao carregar textura:', e);
+    hideLoading();
+    return;
   }
-  tex.colorSpace = THREE.SRGBColorSpace;
 
+  // constrói o mesh de acordo com mono/estéreo + XR
+  let meshToAdd;
   if (isStereo && !renderer.xr.isPresenting) {
     const mat = new THREE.MeshBasicMaterial({ map: tex });
     mat.map.repeat.set(1, 0.5);
     mat.map.offset.set(0, 0.5);
     mat.map.needsUpdate = true;
-    currentMesh = new THREE.Mesh(geo, mat);
+    meshToAdd = new THREE.Mesh(geo, mat);
 
   } else if (isStereo && renderer.xr.isPresenting) {
     const matL = new THREE.MeshBasicMaterial({ map: tex.clone() });
@@ -168,16 +184,29 @@ export async function loadMediaInSphere(url, isStereo) {
     const meshL = new THREE.Mesh(geo.clone(), matL); meshL.layers.set(1);
     const meshR = new THREE.Mesh(geo.clone(), matR); meshR.layers.set(2);
 
-    currentMesh = new THREE.Group();
-    currentMesh.add(meshL, meshR);
+    meshToAdd = new THREE.Group();
+    meshToAdd.add(meshL, meshR);
 
   } else {
-    currentMesh = new THREE.Mesh(
+    meshToAdd = new THREE.Mesh(
       geo,
       new THREE.MeshBasicMaterial({ map: tex })
     );
   }
 
-  scene.add(currentMesh);
-  hideLoading();
+  // *** verificação de token: só adiciona se este for o load mais recente ***
+  if (myToken === loadToken) {
+    currentMesh = meshToAdd;
+    scene.add(currentMesh);
+    hideLoading();
+  } else {
+    // outro load mais novo já começou → descarta recursos
+    meshToAdd.traverse((n) => {
+      if (n.isMesh) {
+        n.material.map?.dispose();
+        n.geometry.dispose();
+        n.material.dispose();
+      }
+    });
+  }
 }
