@@ -1,38 +1,33 @@
 // core.js
 
-// --- 1) Importa a instância única de Three.js
+// 1) Importa a instância única de Three.js
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-// --- 2) Importa o OrbitControls
+// 2) Importa o OrbitControls
 import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
-// --- 3) Exporta pra geral
+// 3) Exporta pra geral
 export { THREE, OrbitControls };
 
 export let scene, camera, renderer;
 export let lastMediaURL    = null;
 export let lastMediaStereo = false;
 
-// --- Token pra cancelar carregamentos antigos
+// --- token pra cancelar carregamentos antigos ----
 let loadToken = 0;
 
-// --- Reuso de objetos da esfera
-let sphereMesh       = null;   // Mesh único que vamos reutilizar
-let sphereGeometry   = null;   // Geometria única, menor subdivisão
-let currentMaterial  = null;   // Material que recebe o map (textura/vídeo)
-
-let loadingMesh      = null;
-let buttonHUDMesh    = null;
+let currentMesh    = null;
+let loadingMesh    = null;
+let buttonHUDMesh  = null;
 
 let loadingCanvas, loadingTexture;
 let buttonCanvas,  buttonTexture;
-let buttonTimeout   = null;
+let buttonTimeout  = null;
 
 export function initializeCore() {
   scene  = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 2000);
   scene.add(camera);
 
-  // ------------- Renderizador sem antialias (melhora performance no VR) -------------
-  renderer = new THREE.WebGLRenderer({ antialias: false });
+  renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(devicePixelRatio);
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -42,14 +37,6 @@ export function initializeCore() {
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
-
-  // ------------- Cria a esfera UMA VEZ e a esconde (reutilizaremos depois) -------------
-  // Reduzimos a resolução para 32 x 16 (antes era 60 x 40)
-  sphereGeometry = new THREE.SphereGeometry(500, 32, 16).scale(-1, 1, 1);
-  currentMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-  sphereMesh = new THREE.Mesh(sphereGeometry, currentMaterial);
-  sphereMesh.visible = false;
-  scene.add(sphereMesh);
 
   /* ---------- HUD “Loading…” ---------- */
   loadingCanvas = document.createElement('canvas');
@@ -128,69 +115,98 @@ export async function loadMediaInSphere(url, isStereo) {
   lastMediaURL    = url;
   lastMediaStereo = isStereo;
 
+  // gera token único pra este load
   const myToken = ++loadToken;
+
   showLoading();
 
-  // Se já existe um map carregado, descarte ele antes de criar o novo
-  if (currentMaterial.map) {
-    currentMaterial.map.dispose();
-    currentMaterial.map = null;
+  // limpa mesh anterior (se existir)
+  if (currentMesh) {
+    scene.remove(currentMesh);
+    currentMesh.traverse((n) => {
+      if (n.isMesh) {
+        n.material.map?.dispose();
+        n.geometry.dispose();
+        n.material.dispose();
+      }
+    });
+    currentMesh = null;
   }
 
-  // Carrega a textura ou cria VideoTexture
+  // prepara esfera e textura
+  const geo = new THREE.SphereGeometry(500, 60, 40).scale(-1, 1, 1);
+  const ext = url.split('.').pop().toLowerCase();
   let tex;
+
   try {
-    const ext = url.split('.').pop().toLowerCase();
     if (['mp4', 'webm', 'mov'].includes(ext)) {
-      // ▶️ VÍDEO: setar crossOrigin antes de definir src
       const vid = document.createElement('video');
+      vid.src         = url;
       vid.crossOrigin = 'anonymous';
-      vid.src = url;
-      vid.loop = true;
-      vid.muted = true;
+      vid.loop        = true;
+      vid.muted       = true;
       vid.playsInline = true;
-      // tenta tocar pra ter frames no VideoTexture
-      await vid.play().catch(() => {});
+      try { await vid.play().catch(() => {}); } catch {}
       tex = new THREE.VideoTexture(vid);
-      tex.colorSpace = THREE.SRGBColorSpace;
     } else {
-      // 📷 IMAGEM: usar TextureLoader com crossOrigin
       const loader = new THREE.TextureLoader();
-      loader.crossOrigin = 'anonymous';
-      tex = await new Promise((ok, err) => {
-        loader.load(url, t => {
-          t.colorSpace = THREE.SRGBColorSpace;
-          ok(t);
-        }, undefined, err);
-      });
+      tex = await new Promise((ok, err) =>
+        loader.load(url, (t) => ok(t), undefined, err)
+      );
     }
+    tex.colorSpace = THREE.SRGBColorSpace;
   } catch (e) {
-    console.error('Falha ao carregar mídia:', e);
+    console.error('Falha ao carregar textura:', e);
     hideLoading();
     return;
   }
 
-  // Se outro load já começou, descarta este
-  if (myToken !== loadToken) {
-    tex.dispose?.();
-    hideLoading();
-    return;
-  }
+  // constrói o mesh de acordo com mono/estéreo + XR
+  let meshToAdd;
+  if (isStereo && !renderer.xr.isPresenting) {
+    const mat = new THREE.MeshBasicMaterial({ map: tex });
+    mat.map.repeat.set(1, 0.5);
+    mat.map.offset.set(0, 0.5);
+    mat.map.needsUpdate = true;
+    meshToAdd = new THREE.Mesh(geo, mat);
 
-  // Atualiza o material com a nova textura
-  currentMaterial.map = tex;
-  currentMaterial.needsUpdate = true;
+  } else if (isStereo && renderer.xr.isPresenting) {
+    const matL = new THREE.MeshBasicMaterial({ map: tex.clone() });
+    matL.map.repeat.set(1, 0.5);
+    matL.map.offset.set(0, 0.5);
+    matL.map.needsUpdate = true;
 
-  // Ajuste de repeat/offset para estéreo ou mono (sem layers)
-  if (isStereo) {
-    currentMaterial.map.repeat.set(1, 0.5);
-    currentMaterial.map.offset.set(0, 0.5);
+    const matR = new THREE.MeshBasicMaterial({ map: tex.clone() });
+    matR.map.repeat.set(1, 0.5);
+    matR.map.offset.set(0, 0);
+    matR.map.needsUpdate = true;
+
+    const meshL = new THREE.Mesh(geo.clone(), matL); meshL.layers.set(1);
+    const meshR = new THREE.Mesh(geo.clone(), matR); meshR.layers.set(2);
+
+    meshToAdd = new THREE.Group();
+    meshToAdd.add(meshL, meshR);
+
   } else {
-    currentMaterial.map.repeat.set(1, 1);
-    currentMaterial.map.offset.set(0, 0);
+    meshToAdd = new THREE.Mesh(
+      geo,
+      new THREE.MeshBasicMaterial({ map: tex })
+    );
   }
 
-  // Mostra a esfera e esconde o loading
-  sphereMesh.visible = true;
-  hideLoading();
+  // *** verificação de token: só adiciona se este for o load mais recente ***
+  if (myToken === loadToken) {
+    currentMesh = meshToAdd;
+    scene.add(currentMesh);
+    hideLoading();
+  } else {
+    // outro load mais novo já começou → descarta recursos
+    meshToAdd.traverse((n) => {
+      if (n.isMesh) {
+        n.material.map?.dispose();
+        n.geometry.dispose();
+        n.material.dispose();
+      }
+    });
+  }
 }
