@@ -1,14 +1,6 @@
 // desktop.js
 import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js?module';
-import {
-  THREE,
-  initializeCore,
-  loadMediaInSphere,
-  scene,
-  camera,
-  renderer,
-  updateHUDPositions
-} from './core.js';
+import { THREE, initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
 
 let controls;
 
@@ -33,4 +25,4 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-export const loadMedia = loadMediaInSphere; // linka direto para a função do core
+export const loadMedia = loadMediaInSphere; // só “linka” direto

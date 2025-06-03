@@ -1,13 +1,5 @@
 // mobile.js
-import {
-  THREE,
-  initializeCore,
-  loadMediaInSphere,
-  scene,
-  camera,
-  renderer,
-  updateHUDPositions
-} from './core.js';
+import { THREE, initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
 
 let dragging = false;
 let sx = 0, sy = 0;
@@ -16,6 +8,7 @@ let lon = 0, lat = 0;
 export function initialize() {
   initializeCore();
   document.body.appendChild(renderer.domElement);
+
   const cvs = renderer.domElement;
 
   cvs.addEventListener('touchstart', (e) => {

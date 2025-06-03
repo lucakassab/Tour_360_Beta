@@ -1,7 +1,7 @@
 // core.js
-// ⚠️ Importa o Three.js APENAS aqui, usando o URL sem "?module"
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-export { THREE };   // reexporta para desktop.js, mobile.js, vr.js
+// ⚠️ Aqui a gente usa o URL COM ?module pra casar com o OrbitControls/VRButton
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js?module';
+export { THREE };
 
 export let scene, camera, renderer;
 export let lastMediaURL    = null;
@@ -31,7 +31,7 @@ export function initializeCore() {
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  /* --------- HUD “Loading…” --------- */
+  /* ---------- HUD “Loading…” ---------- */
   loadingCanvas = document.createElement('canvas');
   loadingCanvas.width  = 512;
   loadingCanvas.height = 128;
@@ -50,7 +50,7 @@ export function initializeCore() {
   loadingMesh.visible = false;
   scene.add(loadingMesh);
 
-  /* --------- HUD “Button” --------- */
+  /* ---------- HUD “Button” ---------- */
   buttonCanvas = document.createElement('canvas');
   buttonCanvas.width  = 512;
   buttonCanvas.height = 128;

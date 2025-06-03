@@ -1,16 +1,6 @@
 // vr.js
 import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js?module';
-import {
-  THREE,
-  scene,
-  camera,
-  renderer,
-  loadMediaInSphere,
-  showButtonHUD,
-  updateHUDPositions,
-  lastMediaURL,
-  lastMediaStereo
-} from './core.js';
+import { THREE, scene, camera, renderer, loadMediaInSphere, showButtonHUD, updateHUDPositions, lastMediaURL, lastMediaStereo } from './core.js';
 
 export let onEnterXR = null;
 
@@ -51,7 +41,6 @@ function loop() {
     s.inputSources.forEach((src) => {
       const gp = src.gamepad;
       if (!gp) return;
-
       if (gp.buttons[4]?.pressed) {
         showButtonHUD(LABEL[4]);
         change(-1);
