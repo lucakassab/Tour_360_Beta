@@ -42,6 +42,22 @@
     }
     #prevBtn:hover, #nextBtn:hover { background: #0056b3 }
     canvas { touch-action: none }
+
+    /* alerta temporário */
+    #mode-alert {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0,0,0,0.8);
+      color: #fff;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 16px;
+      z-index: 10000;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
   </style>
 </head>
 <body>
@@ -52,6 +68,9 @@
     <button id="nextBtn">Próximo</button>
   </div>
 
+  <!-- alerta para mostrar modo (apenas 1s) -->
+  <div id="mode-alert"></div>
+
   <!-- Mapa de importação pros módulos -->
   <script type="importmap">
   { "imports": { "three": "https://unpkg.com/three@0.158.0/build/three.module.js" } }
@@ -60,6 +79,7 @@
 
   <!-- Registro do Service Worker + detecção do modo standalone -->
   <script>
+    // Registra o Service Worker
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
         .register("./sw.js")
@@ -67,15 +87,24 @@
         .catch(err => console.warn("❌ SW falhou:", err));
     }
 
+    // Detecta modo standalone ou navegador normal
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
       window.navigator.standalone === true;
 
-    if (isStandalone) {
-      console.log("📱 Rodando como app instalado (PWA)");
-    } else {
-      console.log("🌐 Rodando no navegador normal");
-    }
+    // Prepara mensagem
+    const alertDiv = document.getElementById('mode-alert');
+    alertDiv.textContent = isStandalone
+      ? "Rodando como app instalado (PWA)"
+      : "Rodando no navegador normal";
+
+    // Exibe por 1 segundo
+    requestAnimationFrame(() => {
+      alertDiv.style.opacity = "1";
+      setTimeout(() => {
+        alertDiv.style.opacity = "0";
+      }, 1000);
+    });
   </script>
 </body>
 </html>
