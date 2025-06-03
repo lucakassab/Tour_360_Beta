@@ -1,10 +1,6 @@
 // vr.js
 
-// Antes (causava "failed to resolve 'three'" ou puxava instância duplicada):
-// import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js?module';
 
-
-// Depois: import sem ?module, para bater com o core.js (e deixar o importmap cuidar do 'three')
 import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js';
 
 import {
@@ -22,7 +18,8 @@ import {
 export let onEnterXR = null;
 
 const LABEL = { 4: 'A', 5: 'B' };
-let canLeft = true, canRight = true;
+let canLeft = true,
+  canRight = true;
 
 function change(delta) {
   const sel = document.getElementById('mediaSelect');
@@ -47,9 +44,10 @@ export function initialize() {
   renderer.xr.addEventListener('sessionstart', () => {
     onEnterXR?.();
     if (lastMediaURL) loadMediaInSphere(lastMediaURL, lastMediaStereo);
-  });
 
-  renderer.setAnimationLoop(loop);
+    // Agora só inicia o loop de VR depois que a sessão realmente começar
+    renderer.setAnimationLoop(loop);
+  });
 }
 
 function loop() {
