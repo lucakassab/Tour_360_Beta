@@ -1,6 +1,15 @@
 // desktop.js
 
-import { OrbitControls, THREE, initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
+import {
+  OrbitControls,
+  THREE,
+  initializeCore,
+  loadMediaInSphere,
+  scene,
+  camera,
+  renderer,
+  updateHUDPositions
+} from './core.js';
 
 let controls;
 

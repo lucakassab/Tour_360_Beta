@@ -1,5 +1,12 @@
+// vr.js
 
-import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js?module';
+// Antes (causava "failed to resolve 'three'" ou puxava instância duplicada):
+// import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js?module';
+
+
+// Depois: import sem ?module, para bater com o core.js (e deixar o importmap cuidar do 'three')
+import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js';
+
 import {
   THREE,
   scene,

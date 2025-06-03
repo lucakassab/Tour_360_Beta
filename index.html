@@ -40,10 +40,19 @@
     <button id="btnLoad">Carregar 360</button>
   </div>
 
-  <!--
-    Só carregamos o loader.js como módulo. O loader vai importar desktop.js, mobile.js e vr.js
-    e todos eles puxam o core.js, que agora traz o THREE e o OrbitControls da MESMA instância.
+  <!-- 
+    IMPORT MAP: diz que qualquer "import ... from 'three'" deve usar exatamente 
+    essa URL do three.module.js
   -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.158.0/build/three.module.js"
+    }
+  }
+  </script>
+
+  <!-- Continua carregando o loader.js normalmente -->
   <script type="module" src="js/loader.js"></script>
 </body>
 </html>

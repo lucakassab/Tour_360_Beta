@@ -1,15 +1,12 @@
 // core.js
 
-// 1) Importa a instância única de Three.js (sem ?module)
+// 1) Importa a instância única de Three.js (sem ?module, para bater com o que o importmap espera)
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-
-// 2) Importa o OrbitControls da MESMA versão do Three (sem ?module)
+// 2) Importa o OrbitControls (ele mesmo internamente faz `import from 'three'`, mas agora será redirecionado pelo importmap)
 import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
-
-// 3) Exporta ambos para todo mundo usar a mesma instância
+// 3) Exporta tudo
 export { THREE, OrbitControls };
 
-// … (resto do seu core.js permanece igual) …
 export let scene, camera, renderer;
 export let lastMediaURL    = null;
 export let lastMediaStereo = false;
