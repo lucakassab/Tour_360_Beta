@@ -1,15 +1,19 @@
-// loader.js
+// js/loader.js
+//
+// Agora usa caminho RELATIVO (“media/…”) em vez de f.download_url
+// → funciona offline porque o Service Worker intercepta pedidos da mesma origem.
 
 (async () => {
-  // 1) Inicializa mobile ou desktop primeiro
+  /* 1) Inicializa módulo mobile ou desktop */
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
   let mediaModule = await import(isMobile ? './mobile.js' : './desktop.js');
   mediaModule.initialize();
 
-  // 2) Busca a lista de mídias no GitHub e preenche o <select>
+  /* 2) Busca lista de arquivos na pasta /media do GitHub */
   const GITHUB_API = 'https://api.github.com/repos/lucakassab/tour_360_beta/contents/media';
-  const EXT = ['.jpg', '.png', '.mp4', '.webm', '.mov'];
-  let mediaList = [];
+  const EXT        = ['.jpg', '.png', '.mp4', '.webm', '.mov'];
+  let mediaList    = [];
+
   try {
     const resp = await fetch(GITHUB_API);
     if (resp.ok) {
@@ -18,7 +22,7 @@
         .filter(f => EXT.some(ext => f.name.toLowerCase().endsWith(ext)))
         .map(f => ({
           name:   f.name,
-          url:    f.download_url,
+          url:    `media/${f.name}`,          // <<< caminho relativo!
           stereo: f.name.toLowerCase().includes('_stereo')
         }));
     } else {
@@ -28,55 +32,46 @@
     console.error('Erro ao buscar mídias:', e);
   }
 
+  /* 3) Preenche o <select> com a lista */
   const select = document.getElementById('mediaSelect');
   mediaList.forEach((m, i) => {
     const opt = document.createElement('option');
-    opt.value = i;
-    opt.textContent = m.name;
-    opt.setAttribute('data-url', m.url);
-    opt.setAttribute('data-stereo', m.stereo ? 'true' : 'false');
+    opt.value   = i;
+    opt.textContent     = m.name;
+    opt.dataset.url     = m.url;
+    opt.dataset.stereo  = m.stereo ? 'true' : 'false';
     select.appendChild(opt);
   });
 
-  // 3) Carrega a mídia sempre que o <select> mudar, sem botão extra
+  /* 4) Carrega mídia quando o select muda */
   select.addEventListener('change', () => {
-    const idx = parseInt(select.value);
-    const opt = select.options[idx];
+    const opt = select.selectedOptions[0];
     if (!opt) return;
-    const url    = opt.getAttribute('data-url');
-    const stereo = opt.getAttribute('data-stereo') === 'true';
-    mediaModule.loadMedia(url, stereo);
+    mediaModule.loadMedia(opt.dataset.url, opt.dataset.stereo === 'true');
   });
 
-  // 4) Botões "Anterior" e "Próximo"
+  /* 5) Botões Anterior / Próximo */
   document.getElementById('prevBtn').addEventListener('click', () => {
-    const total = select.options.length;
-    if (!total) return;
-    let idx = parseInt(select.value);
-    idx = (idx - 1 + total) % total;
-    select.value = idx; // Isso dispara o change e carrega a mídia
-    const opt = select.options[idx];
-    mediaModule.loadMedia(opt.dataset.url, opt.dataset.stereo === 'true');
+    if (!select.options.length) return;
+    let idx = (parseInt(select.value) - 1 + select.options.length) % select.options.length;
+    select.value = idx;
+    select.dispatchEvent(new Event('change'));
   });
 
   document.getElementById('nextBtn').addEventListener('click', () => {
-    const total = select.options.length;
-    if (!total) return;
-    let idx = parseInt(select.value);
-    idx = (idx + 1) % total;
-    select.value = idx; // dispara o change
-    const opt = select.options[idx];
-    mediaModule.loadMedia(opt.dataset.url, opt.dataset.stereo === 'true');
+    if (!select.options.length) return;
+    let idx = (parseInt(select.value) + 1) % select.options.length;
+    select.value = idx;
+    select.dispatchEvent(new Event('change'));
   });
 
-  // 5) Carrega a primeira mídia por padrão (índice 0)
+  /* 6) Carrega a primeira mídia automaticamente */
   if (mediaList.length) {
     select.value = 0;
-    const primeiro = select.options[0];
-    mediaModule.loadMedia(primeiro.dataset.url, primeiro.dataset.stereo === 'true');
+    select.dispatchEvent(new Event('change'));
   }
 
-  // 6) Depois que já carregou tudo, tenta inicializar VR (com try/catch)
+  /* 7) Tenta habilitar VR */
   if (navigator.xr && await navigator.xr.isSessionSupported?.('immersive-vr')) {
     try {
       const vrModule = await import('./vr.js');
@@ -89,7 +84,6 @@
       };
     } catch (e) {
       console.warn('Módulo VR não pôde ser carregado:', e);
-      // Continua normalmente sem VR
     }
   }
 })();
