@@ -5,10 +5,10 @@
   <title>Tour360 – Visualizador 360°</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <!-- Favicon (Vai buscar em "icons/favicon.ico" relativo à pasta do projeto) -->
+  <!-- Favicon -->
   <link rel="icon" href="icons/favicon.ico" type="image/x-icon">
 
-  <!-- Ícone pra iOS (180×180) -->
+  <!-- Ícone pra iOS -->
   <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 
   <!-- Manifest JSON -->
@@ -18,19 +18,25 @@
   <meta name="theme-color" content="#000000" />
 
   <style>
-    body { 
+    /* BLOQUEIA SELEÇÃO DE TEXTO / OVERLAY AZUL NO iOS */
+    html, body {
+      -webkit-user-select: none; /* Safari / iOS */
+      -ms-user-select: none;     /* IE/Edge antigo */
+      user-select: none;         /* Padrão */
+      overscroll-behavior: none;
+      touch-action: none;
       margin: 0;
       overflow: hidden;
       background: #000;
       font-family: sans-serif;
     }
-    html, body {
-      overscroll-behavior: none;
-      touch-action: none;
+    /* Remove highlight azul e menu de copy/long-press */
+    * {
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
     }
-    canvas {
-      touch-action: none;
-    }
+
+    /* ====== UI ====== */
     #menu {
       position: absolute;
       top: 10px;
@@ -44,8 +50,9 @@
       gap: 8px;
       align-items: center;
     }
-    #menu label, #menu select, #menu button {
-      display: block;
+    #menu label,
+    #menu select,
+    #menu button {
       font-size: 14px;
       color: #fff;
     }
@@ -58,7 +65,8 @@
       background: #222;
       color: #fff;
     }
-    #prevBtn, #nextBtn {
+    #prevBtn,
+    #nextBtn {
       padding: 6px 10px;
       font-size: 14px;
       border-radius: 4px;
@@ -67,9 +75,11 @@
       background: #007bff;
       color: #fff;
     }
-    #prevBtn:hover, #nextBtn:hover {
+    #prevBtn:hover,
+    #nextBtn:hover {
       background: #0056b3;
     }
+    canvas { touch-action: none; }
   </style>
 </head>
 <body>
@@ -80,7 +90,7 @@
     <button id="nextBtn">Próximo</button>
   </div>
 
-  <!-- importmap para resolver 'three' nos módulos -->
+  <!-- importmap para 'three' -->
   <script type="importmap">
   {
     "imports": {
@@ -89,7 +99,7 @@
   }
   </script>
 
-  <!-- Carrega o loader principal, que escolhe entre desktop.js ou mobile.js -->
+  <!-- Loader principal -->
   <script type="module" src="js/loader.js"></script>
 </body>
 </html>
