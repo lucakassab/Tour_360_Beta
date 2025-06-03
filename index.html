@@ -1,69 +1,23 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
-  <meta charset="utf-8" />
-  <title>Tour360 – Visualizador 360°</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body{margin:0;overflow:hidden;background:#000;font-family:sans-serif}
-    html, body {
-      overscroll-behavior: none;
-      touch-action: none;
-    }
-    canvas {
-      touch-action: none;
-    }
-    #menu{
-      position:absolute;top:10px;left:10px;z-index:999;
-      background:rgba(0,0,0,.5);color:#fff;
-      padding:8px;border-radius:6px;
-      display:flex;
-      gap:8px;
-      align-items:center;
-    }
-    #menu label,#menu select,#menu button{
-      display:block;
-      font-size:14px;
-      color:#fff;
-    }
-    #mediaSelect {
-      padding:6px;
-      border-radius:4px;
-      border:none;
-      cursor:pointer;
-      min-width:150px;
-    }
-    #prevBtn, #nextBtn {
-      padding:6px 10px;
-      font-size:14px;
-      border-radius:4px;
-      border:none;
-      cursor:pointer;
-      background:#007bff;
-      color:#fff;
-    }
-    #prevBtn:hover, #nextBtn:hover {
-      background:#0056b3;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teu Tour Virtual</title>
+
+  <!-- Favicon (favicon.ico na pasta /icons) -->
+  <link rel="icon" href="/icons/favicon.ico" type="image/x-icon">
+
+  <!-- Ícone pra iOS -->
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png">
+
+  <!-- Manifest JSON (na raiz) -->
+  <link rel="manifest" href="/manifest.json">
+
+  <!-- Cor da barra no Android -->
+  <meta name="theme-color" content="#000000" />
 </head>
 <body>
-  <div id="menu">
-    <label for="mediaSelect">Mídia:</label>
-    <select id="mediaSelect"></select>
-    <button id="prevBtn">Anterior</button>
-    <button id="nextBtn">Próximo</button>
-  </div>
-
-  <!-- importmap mantido para resolver 'three' -->
-  <script type="importmap">
-  {
-    "imports": {
-      "three": "https://unpkg.com/three@0.158.0/build/three.module.js"
-    }
-  }
-  </script>
-
-  <script type="module" src="js/loader.js"></script>
+  <!-- resto do teu código -->
 </body>
 </html>
