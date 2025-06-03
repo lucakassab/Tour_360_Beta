@@ -14,7 +14,7 @@ export let lastMediaStereo = false;
 // --- Token pra cancelar carregamentos antigos ----
 let loadToken = 0;
 
-// --- Reuso de objetos ---
+// --- Reuso de objetos da esfera ---
 let sphereMesh       = null;   // Mesh único que vamos reutilizar
 let sphereGeometry   = null;   // Geometria única, menor subdivisão
 let currentMaterial  = null;   // Material que recebe o map (textura/vídeo)
@@ -43,8 +43,8 @@ export function initializeCore() {
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  // ------------- Cria a esfera UMA VEZ e esconde, reutilizando depois -------------
-  // Resolução reduzida: 32 x 16 no lugar de 60 x 40
+  // ------------- Cria a esfera UMA VEZ e a esconde (reutilizaremos depois) -------------
+  // Reduzimos a resolução para 32 x 16 (antes era 60 x 40)
   sphereGeometry = new THREE.SphereGeometry(500, 32, 16).scale(-1, 1, 1);
   currentMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
   sphereMesh = new THREE.Mesh(sphereGeometry, currentMaterial);
@@ -131,13 +131,13 @@ export async function loadMediaInSphere(url, isStereo) {
   const myToken = ++loadToken;
   showLoading();
 
-  // Se já existe uma textura carregada, descarta ela antes de criar a nova
+  // Se já existe um map carregado, conheça-o antes de criar o novo
   if (currentMaterial.map) {
     currentMaterial.map.dispose();
     currentMaterial.map = null;
   }
 
-  // Espera carregar a textura ou criar o VideoTexture
+  // Carrega a textura ou cria VideoTexture
   let tex;
   try {
     const ext = url.split('.').pop().toLowerCase();
@@ -162,40 +162,25 @@ export async function loadMediaInSphere(url, isStereo) {
     return;
   }
 
-  // Se outro load for iniciado antes de terminar, descarta este
+  // Se outro load já começou, descarta este
   if (myToken !== loadToken) {
     tex.dispose?.();
     hideLoading();
     return;
   }
 
-  // Atualiza o material existente com a nova textura
+  // Atualiza o material com a nova textura
   currentMaterial.map = tex;
   currentMaterial.needsUpdate = true;
 
-  // Gere o mesh (mono ou estéreo) corretamente
+  // Ajuste de repeat/offset para estéreo ou mono (sem layers)
   if (isStereo) {
-    // MONO vs. ESTÉREO em tela plana (quando não em VR, remove offset)
-    if (!renderer.xr.isPresenting) {
-      currentMaterial.map.repeat.set(1, 0.5);
-      currentMaterial.map.offset.set(0, 0.5);
-    } else {
-      // Em VR, a gente precisa de 2 esferas? Mas pra simplificar,
-      // vamos reutilizar a mesma esfera e ativar layers se necessário.
-      // (Se quiser versão full stereo VR, seria similar ao antigo,
-      // mas geralmente 1 esfera já basta e o headset cuida do stereo.)
-      currentMaterial.map.repeat.set(1, 0.5);
-      currentMaterial.map.offset.set(0, 0.5);
-    }
+    currentMaterial.map.repeat.set(1, 0.5);
+    currentMaterial.map.offset.set(0, 0.5);
   } else {
-    // Mono → full 1:1 na textura
     currentMaterial.map.repeat.set(1, 1);
     currentMaterial.map.offset.set(0, 0);
   }
-
-  // Ajusta layers da câmera para visão estéreo se for o caso
-  camera.layers.enable(isStereo ? 1 : 0);
-  camera.layers.disable(isStereo ? 0 : 1);
 
   // Mostra a esfera e esconde o loading
   sphereMesh.visible = true;
