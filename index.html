@@ -40,6 +40,10 @@
     <button id="btnLoad">Carregar 360</button>
   </div>
 
+  <!--
+    Só carregamos o loader.js como módulo. O loader vai importar desktop.js, mobile.js e vr.js
+    e todos eles puxam o core.js, que agora traz o THREE e o OrbitControls da MESMA instância.
+  -->
   <script type="module" src="js/loader.js"></script>
 </body>
 </html>

@@ -1,6 +1,13 @@
+// core.js
 
-import * as THREE from 'https://unpkg.com/three@0.158.0?module';
-export { THREE };
+// 1) Importa a instância única de Three.js
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js?module';
+
+// 2) Importa o OrbitControls da MESMA versão do Three, para não criar instância duplicada
+import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js?module';
+
+// 3) Exporta ambos para todo mundo usar a mesma instância
+export { THREE, OrbitControls };
 
 export let scene, camera, renderer;
 export let lastMediaURL    = null;

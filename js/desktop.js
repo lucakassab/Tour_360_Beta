@@ -1,14 +1,6 @@
+// desktop.js
 
-import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js?module';
-import {
-  THREE,
-  initializeCore,
-  loadMediaInSphere,
-  scene,
-  camera,
-  renderer,
-  updateHUDPositions
-} from './core.js';
+import { OrbitControls, THREE, initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
 
 let controls;
 
@@ -18,6 +10,7 @@ export function initialize() {
 
   camera.position.set(0, 0, 0.1);
 
+  // Usa OrbitControls que já veio de core.js (mesma instância do THREE)
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan   = false;
   controls.rotateSpeed = 0.4;
