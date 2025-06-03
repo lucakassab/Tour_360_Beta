@@ -10,7 +10,6 @@ export function initialize() {
 
   camera.position.set(0, 0, 0.1);
 
-  // Usa OrbitControls que já veio de core.js (mesma instância do THREE)
   controls = new OrbitControls(camera, renderer.domElement);
   controls.enablePan   = false;
   controls.rotateSpeed = 0.4;
