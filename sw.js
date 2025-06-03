@@ -11,7 +11,8 @@ const CORE_FILES  = [
   "js/core.js",
   "js/desktop.js",
   "js/mobile.js",
-  "js/vr.js"
+  "js/vr.js",
+  "js/VRButton.js"
 ];
 
 // Instalamos apenas os arquivos essenciais (não inclui mídias)
