@@ -1,5 +1,14 @@
 // mobile.js
-import { THREE, initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
+// NUNCA importa Three.js de CDN – PUXA via core.js (só existe uma instância)
+import {
+  THREE,
+  initializeCore,
+  loadMediaInSphere,
+  scene,
+  camera,
+  renderer,
+  updateHUDPositions
+} from './core.js';
 
 let dragging = false;
 let sx = 0, sy = 0;
@@ -10,7 +19,6 @@ export function initialize() {
   document.body.appendChild(renderer.domElement);
 
   const cvs = renderer.domElement;
-
   cvs.addEventListener('touchstart', (e) => {
     if (e.touches.length === 1) {
       dragging = true;

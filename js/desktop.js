@@ -1,6 +1,16 @@
 // desktop.js
+// Importa OrbitControls com "?module". Internamente, o unpkg vai reescrever 'import "three"' para
+// "https://unpkg.com/three@0.158.0/build/three.module.js" (sem ?module), que é EXATAMENTE a URL que o core.js usou.
 import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js?module';
-import { THREE, initializeCore, loadMediaInSphere, scene, camera, renderer, updateHUDPositions } from './core.js';
+import {
+  THREE,
+  initializeCore,
+  loadMediaInSphere,
+  scene,
+  camera,
+  renderer,
+  updateHUDPositions
+} from './core.js';
 
 let controls;
 
@@ -25,4 +35,5 @@ function animate() {
   renderer.render(scene, camera);
 }
 
-export const loadMedia = loadMediaInSphere; // só “linka” direto
+// Reexporta direta a loadMediaInSphere do core
+export const loadMedia = loadMediaInSphere;
