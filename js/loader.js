@@ -1,22 +1,12 @@
+// loader.js
 
 (async () => {
+  // 1) Inicializa mobile ou desktop primeiro
   const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const canVR    = navigator.xr && await navigator.xr.isSessionSupported?.('immersive-vr');
-
   let mediaModule = await import(isMobile ? './mobile.js' : './desktop.js');
   mediaModule.initialize();
 
-  if (canVR) {
-    const vrModule = await import('./vr.js');
-    vrModule.initialize();
-    vrModule.onEnterXR = () => {
-      mediaModule = vrModule;
-      if (vrModule.lastMediaURL) {
-        vrModule.loadMedia(vrModule.lastMediaURL, vrModule.lastMediaStereo);
-      }
-    };
-  }
-
+  // 2) Carrega a lista de mídias e preenche o select; só então chama mediaModule.loadMedia
   const GITHUB_API = 'https://api.github.com/repos/lucakassab/tour_360_beta/contents/media';
   const EXT = ['.jpg', '.png', '.mp4', '.webm', '.mov'];
   let mediaList = [];
@@ -62,5 +52,22 @@
     const url0     = primeiro.getAttribute('data-url');
     const stereo0  = primeiro.getAttribute('data-stereo') === 'true';
     mediaModule.loadMedia(url0, stereo0);
+  }
+
+  // 3) Só depois de ter carregado e exibido a mídia é que tentamos importar o módulo VR
+  if (navigator.xr && await navigator.xr.isSessionSupported?.('immersive-vr')) {
+    try {
+      const vrModule = await import('./vr.js');
+      vrModule.initialize();
+      vrModule.onEnterXR = () => {
+        mediaModule = vrModule;
+        if (vrModule.lastMediaURL) {
+          vrModule.loadMedia(vrModule.lastMediaURL, vrModule.lastMediaStereo);
+        }
+      };
+    } catch (e) {
+      console.warn('Módulo VR não pôde ser carregado:', e);
+      // Continua normalmente sem VR
+    }
   }
 })();
