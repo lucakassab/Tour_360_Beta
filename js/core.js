@@ -1,7 +1,5 @@
-// core.js
-// IMPORTA Three.js EXATAMENTE SEM ?module, 
-// que é o mesmo URL que o OrbitControls/VRButton vão usar INTERNAMENTE
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+
+import * as THREE from 'https://unpkg.com/three@0.158.0?module';
 export { THREE };
 
 export let scene, camera, renderer;

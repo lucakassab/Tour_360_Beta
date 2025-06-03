@@ -1,6 +1,4 @@
-// vr.js
-// Importa VRButton com "?module". Internamente, o unpkg vai reescrever 'import "three"' 
-// para "https://unpkg.com/three@0.158.0/build/three.module.js" – mesma URL do core.js.
+
 import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js?module';
 import {
   THREE,

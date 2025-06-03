@@ -1,6 +1,4 @@
-// desktop.js
-// Importa OrbitControls com "?module". Internamente, o unpkg vai reescrever 'import "three"' para
-// "https://unpkg.com/three@0.158.0/build/three.module.js" (sem ?module), que é EXATAMENTE a URL que o core.js usou.
+
 import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js?module';
 import {
   THREE,

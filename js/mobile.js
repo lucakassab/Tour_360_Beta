@@ -1,5 +1,4 @@
-// mobile.js
-// NUNCA importa Three.js de CDN – PUXA via core.js (só existe uma instância)
+
 import {
   THREE,
   initializeCore,
