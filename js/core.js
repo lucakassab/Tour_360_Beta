@@ -22,34 +22,34 @@ let loadingCanvas, loadingTexture;
 let buttonCanvas,  buttonTexture;
 let buttonTimeout  = null;
 
-export async function initializeCore() {
+/**
+ * Inicializa core (scene, câmera, renderer e HUDs) de forma síncrona.
+ * A parte de checar XR e foveated rendering é feita depois, via .then(),
+ * pra não pausar a criação dos HUDs.
+ */
+export function initializeCore() {
+  // 1) Cena e Câmera
   scene  = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 2000);
   scene.add(camera);
 
-  // Cria renderer sem antialias para melhorar performance; força high-performance
+  // 2) Renderer sem antialias e com pixelRatio limitado → performance
   renderer = new THREE.WebGLRenderer({
     antialias: false,
     powerPreference: 'high-performance',
   });
-  // Limita o devicePixelRatio para no máximo 2
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); // evita explodir a GPU
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
 
-  // Se o dispositivo suportar XR, configura foveated rendering
-  if (navigator.xr && (await navigator.xr.isSessionSupported?.('immersive-vr'))) {
-    // Nível de foveation entre 0 e 3; 1 ou 2 costuma ser bom
-    renderer.xr.setFoveation?.(1);
-  }
-
+  // 3) Resize handler
   window.addEventListener('resize', () => {
     camera.aspect = innerWidth / innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  /* ---------- HUD “Loading…” ---------- */
+  // 4) Cria HUD “Loading…” imediatamente
   loadingCanvas = document.createElement('canvas');
   loadingCanvas.width  = 512;
   loadingCanvas.height = 128;
@@ -68,7 +68,7 @@ export async function initializeCore() {
   loadingMesh.visible = false;
   scene.add(loadingMesh);
 
-  /* ---------- HUD “Button” ---------- */
+  // 5) Cria HUD “Button” imediatamente
   buttonCanvas = document.createElement('canvas');
   buttonCanvas.width  = 512;
   buttonCanvas.height = 128;
@@ -86,12 +86,28 @@ export async function initializeCore() {
   );
   buttonHUDMesh.visible = false;
   scene.add(buttonHUDMesh);
+
+  // 6) Depois que já temos renderer + HUDs, tenta checar XR e foveated rendering
+  if (navigator.xr && navigator.xr.isSessionSupported) {
+    navigator.xr.isSessionSupported('immersive-vr')
+      .then((suporta) => {
+        if (suporta) {
+          // Só ativa foveation se suportar
+          renderer.xr.setFoveation?.(1);
+        }
+      })
+      .catch(() => {
+        // ignora erro de checagem
+      });
+  }
 }
 
-export const showLoading = () => (loadingMesh.visible = true);
-export const hideLoading = () => (loadingMesh.visible = false);
+export const showLoading = () => { if (loadingMesh) loadingMesh.visible = true; };
+export const hideLoading = () => { if (loadingMesh) loadingMesh.visible = false; };
 
 export function updateHUDPositions() {
+  // Se não tiver inicializado ainda os HUDs, sai fora
+  if (!loadingMesh || !buttonHUDMesh) return;
   // Se nenhum HUD estiver visível, não faz nada
   if (!loadingMesh.visible && !buttonHUDMesh.visible) return;
 
@@ -111,6 +127,7 @@ export function updateHUDPositions() {
 }
 
 export function showButtonHUD(txt) {
+  if (!buttonCanvas || !buttonTexture || !buttonHUDMesh) return;
   const ctx = buttonCanvas.getContext('2d');
   ctx.clearRect(0, 0, 512, 128);
   ctx.fillStyle = 'rgba(0,0,0,.7)';
@@ -122,7 +139,9 @@ export function showButtonHUD(txt) {
   buttonTexture.needsUpdate = true;
   buttonHUDMesh.visible = true;
   clearTimeout(buttonTimeout);
-  buttonTimeout = setTimeout(() => (buttonHUDMesh.visible = false), 2000);
+  buttonTimeout = setTimeout(() => {
+    if (buttonHUDMesh) buttonHUDMesh.visible = false;
+  }, 2000);
 }
 
 export async function loadMediaInSphere(url, isStereo) {
@@ -148,7 +167,7 @@ export async function loadMediaInSphere(url, isStereo) {
   }
 
   // Cria esfera com menos segmentos pra economizar vértices
-  const SEG_W = 40;   // Ajustar pra 32 no mobile se necessário
+  const SEG_W = 40;   // Se ainda engasgar no mobile, testa 32 ou menos
   const SEG_H = 28;
   const geo = new THREE.SphereGeometry(500, SEG_W, SEG_H).scale(-1, 1, 1);
 
@@ -166,13 +185,13 @@ export async function loadMediaInSphere(url, isStereo) {
       try { await vid.play().catch(() => {}); } catch {}
       tex = new THREE.VideoTexture(vid);
 
-      // Ajustes de filtros e mipmaps
+      // Ajustes de filtros e mipmaps (economiza GPU)
       tex.minFilter = THREE.LinearFilter;
       tex.magFilter = THREE.LinearFilter;
       tex.generateMipmaps = false;
       tex.colorSpace = THREE.SRGBColorSpace;
 
-      // Atualiza só quando chega frame novo (Chrome ≥94)
+      // Atualiza só quando chega quadro novo (Chrome ≥94)
       if ('requestVideoFrameCallback' in vid) {
         const updateTex = () => {
           tex.needsUpdate = true;
@@ -201,12 +220,15 @@ export async function loadMediaInSphere(url, isStereo) {
   let meshToAdd;
   const inXR = renderer.xr.isPresenting;
   if (isStereo && !inXR) {
+    // Mono no desktop / mobile: mostra metade superior (esquerda)
     const mat = new THREE.MeshBasicMaterial({ map: tex });
     mat.map.repeat.set(1, 0.5);
     mat.map.offset.set(0, 0.5);
     mat.map.needsUpdate = true;
     meshToAdd = new THREE.Mesh(geo, mat);
+
   } else if (isStereo && inXR) {
+    // Estéreo no VR: dois materiais (esquerdo/direito)
     const matL = new THREE.MeshBasicMaterial({ map: tex.clone() });
     matL.map.repeat.set(1, 0.5);
     matL.map.offset.set(0, 0.5);
@@ -224,7 +246,9 @@ export async function loadMediaInSphere(url, isStereo) {
 
     meshToAdd = new THREE.Group();
     meshToAdd.add(meshL, meshR);
+
   } else {
+    // Mono padrão
     meshToAdd = new THREE.Mesh(
       geo,
       new THREE.MeshBasicMaterial({ map: tex })
@@ -237,7 +261,7 @@ export async function loadMediaInSphere(url, isStereo) {
     scene.add(currentMesh);
     hideLoading();
   } else {
-    // Discartar recursos se não for mais atual
+    // Descartar recursos
     meshToAdd.traverse((n) => {
       if (n.isMesh) {
         n.material.map?.dispose();
