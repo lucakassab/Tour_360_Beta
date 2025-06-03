@@ -1,19 +1,19 @@
 // core.js
-// PEGA Three.js UMA ÚNICA VEZ — usa o MESMO URL que o OrbitControls/VRButton resolvem internamente
-import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js?module';
-export { THREE };   // reexporta pra geral
+// ⚠️ Importa o Three.js APENAS aqui, usando o URL sem "?module"
+import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
+export { THREE };   // reexporta para desktop.js, mobile.js, vr.js
 
 export let scene, camera, renderer;
-export let lastMediaURL = null;
+export let lastMediaURL    = null;
 export let lastMediaStereo = false;
 
-let currentMesh = null;
-let loadingMesh = null;
-let buttonHUDMesh = null;
+let currentMesh    = null;
+let loadingMesh    = null;
+let buttonHUDMesh  = null;
 
 let loadingCanvas, loadingTexture;
-let buttonCanvas, buttonTexture;
-let buttonTimeout = null;
+let buttonCanvas,  buttonTexture;
+let buttonTimeout  = null;
 
 export function initializeCore() {
   scene  = new THREE.Scene();
@@ -31,9 +31,9 @@ export function initializeCore() {
     renderer.setSize(innerWidth, innerHeight);
   });
 
-  /* ---------- HUD “Loading…” ---------- */
+  /* --------- HUD “Loading…” --------- */
   loadingCanvas = document.createElement('canvas');
-  loadingCanvas.width = 512;
+  loadingCanvas.width  = 512;
   loadingCanvas.height = 128;
   const ctxL = loadingCanvas.getContext('2d');
   ctxL.fillStyle = 'rgba(0,0,0,.7)';
@@ -50,9 +50,9 @@ export function initializeCore() {
   loadingMesh.visible = false;
   scene.add(loadingMesh);
 
-  /* ---------- HUD “Button” ---------- */
+  /* --------- HUD “Button” --------- */
   buttonCanvas = document.createElement('canvas');
-  buttonCanvas.width = 512;
+  buttonCanvas.width  = 512;
   buttonCanvas.height = 128;
   const ctxB = buttonCanvas.getContext('2d');
   ctxB.fillStyle = 'rgba(0,0,0,.7)';
@@ -70,8 +70,8 @@ export function initializeCore() {
   scene.add(buttonHUDMesh);
 }
 
-export const showLoading  = () => (loadingMesh.visible = true);
-export const hideLoading  = () => (loadingMesh.visible = false);
+export const showLoading = () => (loadingMesh.visible = true);
+export const hideLoading = () => (loadingMesh.visible = false);
 
 export function updateHUDPositions() {
   const dir = new THREE.Vector3();
@@ -128,11 +128,11 @@ export async function loadMediaInSphere(url, isStereo) {
 
   if (['mp4', 'webm', 'mov'].includes(ext)) {
     const vid = document.createElement('video');
-    vid.src           = url;
-    vid.crossOrigin   = 'anonymous';
-    vid.loop          = true;
-    vid.muted         = true;
-    vid.playsInline   = true;
+    vid.src         = url;
+    vid.crossOrigin = 'anonymous';
+    vid.loop        = true;
+    vid.muted       = true;
+    vid.playsInline = true;
     try { await vid.play().catch(() => {}); } catch {}
     tex = new THREE.VideoTexture(vid);
   } else {

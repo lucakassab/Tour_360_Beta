@@ -28,7 +28,9 @@ function change(delta) {
   );
 }
 
-function rotate(deg) { scene.rotation.y += THREE.MathUtils.degToRad(deg); }
+function rotate(deg) {
+  scene.rotation.y += THREE.MathUtils.degToRad(deg);
+}
 
 export function initialize() {
   if (renderer.xr.enabled) return;
@@ -46,17 +48,31 @@ export function initialize() {
 function loop() {
   const s = renderer.xr.getSession();
   if (s) {
-    s.inputSources.forEach(src => {
+    s.inputSources.forEach((src) => {
       const gp = src.gamepad;
       if (!gp) return;
 
-      if (gp.buttons[4]?.pressed) { showButtonHUD(LABEL[4]); change(-1); }
-      if (gp.buttons[5]?.pressed) { showButtonHUD(LABEL[5]); change(+1); }
+      if (gp.buttons[4]?.pressed) {
+        showButtonHUD(LABEL[4]);
+        change(-1);
+      }
+      if (gp.buttons[5]?.pressed) {
+        showButtonHUD(LABEL[5]);
+        change(+1);
+      }
 
       const ax = gp.axes[2] ?? gp.axes[0];
-      if (ax > 0.5 && canRight) { rotate(-20); canRight = false; }
-      if (ax < -0.5 && canLeft)  { rotate(20);  canLeft  = false; }
-      if (Math.abs(ax) <= 0.5) { canLeft = canRight = true; }
+      if (ax > 0.5 && canRight) {
+        rotate(-20);
+        canRight = false;
+      }
+      if (ax < -0.5 && canLeft) {
+        rotate(20);
+        canLeft = false;
+      }
+      if (Math.abs(ax) <= 0.5) {
+        canLeft = canRight = true;
+      }
     });
   }
   updateHUDPositions();
