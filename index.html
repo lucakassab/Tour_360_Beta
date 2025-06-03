@@ -48,10 +48,12 @@
   <script>
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker
-        .register("sw.js")
+        // “./sw.js” força a busca relativa ao próprio index.html
+        .register("./sw.js")
         .then(() => console.log("Service Worker registrado!"))
         .catch(err => console.warn("SW falhou", err));
     }
   </script>
+
 </body>
 </html>
