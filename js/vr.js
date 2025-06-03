@@ -1,6 +1,6 @@
 // vr.js
 
-import { VRButton } from 'https://unpkg.com/three@0.158.0/examples/jsm/webxr/VRButton.js';
+import { VRButton } from './js/VRButton.js';
 
 import {
   THREE,
