@@ -22,13 +22,13 @@
           url:    f.download_url,
           stereo: f.name.toLowerCase().includes('_stereo')
         }));
+      console.log('[loader] mediaList:', mediaList);
     } else {
       console.error('Falha ao buscar mídias:', resp.status);
     }
   } catch (e) {
     console.error('Erro ao buscar mídias:', e);
   }
-
   // 3) Preenche o <select id="mediaSelect">
   const select = document.getElementById('mediaSelect');
   mediaList.forEach((m, i) => {

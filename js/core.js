@@ -1,20 +1,20 @@
 // core.js
 
-// 1) Importa a instância única de Three.js
+// --- 1) Importa a instância única de Three.js
 import * as THREE from 'https://unpkg.com/three@0.158.0/build/three.module.js';
-// 2) Importa o OrbitControls
+// --- 2) Importa o OrbitControls
 import { OrbitControls } from 'https://unpkg.com/three@0.158.0/examples/jsm/controls/OrbitControls.js';
-// 3) Exporta pra geral
+// --- 3) Exporta pra geral
 export { THREE, OrbitControls };
 
 export let scene, camera, renderer;
 export let lastMediaURL    = null;
 export let lastMediaStereo = false;
 
-// --- Token pra cancelar carregamentos antigos ----
+// --- Token pra cancelar carregamentos antigos
 let loadToken = 0;
 
-// --- Reuso de objetos da esfera ---
+// --- Reuso de objetos da esfera
 let sphereMesh       = null;   // Mesh único que vamos reutilizar
 let sphereGeometry   = null;   // Geometria única, menor subdivisão
 let currentMaterial  = null;   // Material que recebe o map (textura/vídeo)
@@ -131,7 +131,7 @@ export async function loadMediaInSphere(url, isStereo) {
   const myToken = ++loadToken;
   showLoading();
 
-  // Se já existe um map carregado, conheça-o antes de criar o novo
+  // Se já existe um map carregado, descarte ele antes de criar o novo
   if (currentMaterial.map) {
     currentMaterial.map.dispose();
     currentMaterial.map = null;
@@ -142,20 +142,28 @@ export async function loadMediaInSphere(url, isStereo) {
   try {
     const ext = url.split('.').pop().toLowerCase();
     if (['mp4', 'webm', 'mov'].includes(ext)) {
+      // ▶️ VÍDEO: setar crossOrigin antes de definir src
       const vid = document.createElement('video');
-      vid.src = url;
       vid.crossOrigin = 'anonymous';
+      vid.src = url;
       vid.loop = true;
       vid.muted = true;
       vid.playsInline = true;
+      // tenta tocar pra ter frames no VideoTexture
       await vid.play().catch(() => {});
       tex = new THREE.VideoTexture(vid);
+      tex.colorSpace = THREE.SRGBColorSpace;
     } else {
+      // 📷 IMAGEM: usar TextureLoader com crossOrigin
+      const loader = new THREE.TextureLoader();
+      loader.crossOrigin = 'anonymous';
       tex = await new Promise((ok, err) => {
-        new THREE.TextureLoader().load(url, t => ok(t), undefined, err);
+        loader.load(url, t => {
+          t.colorSpace = THREE.SRGBColorSpace;
+          ok(t);
+        }, undefined, err);
       });
     }
-    tex.colorSpace = THREE.SRGBColorSpace;
   } catch (e) {
     console.error('Falha ao carregar mídia:', e);
     hideLoading();
