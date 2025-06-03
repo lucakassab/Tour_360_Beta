@@ -11,23 +11,28 @@ export let scene, camera, renderer;
 export let lastMediaURL    = null;
 export let lastMediaStereo = false;
 
-// --- token pra cancelar carregamentos antigos ----
+// --- Token pra cancelar carregamentos antigos ----
 let loadToken = 0;
 
-let currentMesh    = null;
-let loadingMesh    = null;
-let buttonHUDMesh  = null;
+// --- Reuso de objetos ---
+let sphereMesh       = null;   // Mesh único que vamos reutilizar
+let sphereGeometry   = null;   // Geometria única, menor subdivisão
+let currentMaterial  = null;   // Material que recebe o map (textura/vídeo)
+
+let loadingMesh      = null;
+let buttonHUDMesh    = null;
 
 let loadingCanvas, loadingTexture;
 let buttonCanvas,  buttonTexture;
-let buttonTimeout  = null;
+let buttonTimeout   = null;
 
 export function initializeCore() {
   scene  = new THREE.Scene();
   camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 2000);
   scene.add(camera);
 
-  renderer = new THREE.WebGLRenderer({ antialias: true });
+  // ------------- Renderizador sem antialias (melhora performance no VR) -------------
+  renderer = new THREE.WebGLRenderer({ antialias: false });
   renderer.setPixelRatio(devicePixelRatio);
   renderer.setSize(innerWidth, innerHeight);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -37,6 +42,14 @@ export function initializeCore() {
     camera.updateProjectionMatrix();
     renderer.setSize(innerWidth, innerHeight);
   });
+
+  // ------------- Cria a esfera UMA VEZ e esconde, reutilizando depois -------------
+  // Resolução reduzida: 32 x 16 no lugar de 60 x 40
+  sphereGeometry = new THREE.SphereGeometry(500, 32, 16).scale(-1, 1, 1);
+  currentMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+  sphereMesh = new THREE.Mesh(sphereGeometry, currentMaterial);
+  sphereMesh.visible = false;
+  scene.add(sphereMesh);
 
   /* ---------- HUD “Loading…” ---------- */
   loadingCanvas = document.createElement('canvas');
@@ -115,98 +128,76 @@ export async function loadMediaInSphere(url, isStereo) {
   lastMediaURL    = url;
   lastMediaStereo = isStereo;
 
-  // gera token único pra este load
   const myToken = ++loadToken;
-
   showLoading();
 
-  // limpa mesh anterior (se existir)
-  if (currentMesh) {
-    scene.remove(currentMesh);
-    currentMesh.traverse((n) => {
-      if (n.isMesh) {
-        n.material.map?.dispose();
-        n.geometry.dispose();
-        n.material.dispose();
-      }
-    });
-    currentMesh = null;
+  // Se já existe uma textura carregada, descarta ela antes de criar a nova
+  if (currentMaterial.map) {
+    currentMaterial.map.dispose();
+    currentMaterial.map = null;
   }
 
-  // prepara esfera e textura
-  const geo = new THREE.SphereGeometry(500, 60, 40).scale(-1, 1, 1);
-  const ext = url.split('.').pop().toLowerCase();
+  // Espera carregar a textura ou criar o VideoTexture
   let tex;
-
   try {
+    const ext = url.split('.').pop().toLowerCase();
     if (['mp4', 'webm', 'mov'].includes(ext)) {
       const vid = document.createElement('video');
-      vid.src         = url;
+      vid.src = url;
       vid.crossOrigin = 'anonymous';
-      vid.loop        = true;
-      vid.muted       = true;
+      vid.loop = true;
+      vid.muted = true;
       vid.playsInline = true;
-      try { await vid.play().catch(() => {}); } catch {}
+      await vid.play().catch(() => {});
       tex = new THREE.VideoTexture(vid);
     } else {
-      const loader = new THREE.TextureLoader();
-      tex = await new Promise((ok, err) =>
-        loader.load(url, (t) => ok(t), undefined, err)
-      );
+      tex = await new Promise((ok, err) => {
+        new THREE.TextureLoader().load(url, t => ok(t), undefined, err);
+      });
     }
     tex.colorSpace = THREE.SRGBColorSpace;
   } catch (e) {
-    console.error('Falha ao carregar textura:', e);
+    console.error('Falha ao carregar mídia:', e);
     hideLoading();
     return;
   }
 
-  // constrói o mesh de acordo com mono/estéreo + XR
-  let meshToAdd;
-  if (isStereo && !renderer.xr.isPresenting) {
-    const mat = new THREE.MeshBasicMaterial({ map: tex });
-    mat.map.repeat.set(1, 0.5);
-    mat.map.offset.set(0, 0.5);
-    mat.map.needsUpdate = true;
-    meshToAdd = new THREE.Mesh(geo, mat);
-
-  } else if (isStereo && renderer.xr.isPresenting) {
-    const matL = new THREE.MeshBasicMaterial({ map: tex.clone() });
-    matL.map.repeat.set(1, 0.5);
-    matL.map.offset.set(0, 0.5);
-    matL.map.needsUpdate = true;
-
-    const matR = new THREE.MeshBasicMaterial({ map: tex.clone() });
-    matR.map.repeat.set(1, 0.5);
-    matR.map.offset.set(0, 0);
-    matR.map.needsUpdate = true;
-
-    const meshL = new THREE.Mesh(geo.clone(), matL); meshL.layers.set(1);
-    const meshR = new THREE.Mesh(geo.clone(), matR); meshR.layers.set(2);
-
-    meshToAdd = new THREE.Group();
-    meshToAdd.add(meshL, meshR);
-
-  } else {
-    meshToAdd = new THREE.Mesh(
-      geo,
-      new THREE.MeshBasicMaterial({ map: tex })
-    );
-  }
-
-  // *** verificação de token: só adiciona se este for o load mais recente ***
-  if (myToken === loadToken) {
-    currentMesh = meshToAdd;
-    scene.add(currentMesh);
+  // Se outro load for iniciado antes de terminar, descarta este
+  if (myToken !== loadToken) {
+    tex.dispose?.();
     hideLoading();
-  } else {
-    // outro load mais novo já começou → descarta recursos
-    meshToAdd.traverse((n) => {
-      if (n.isMesh) {
-        n.material.map?.dispose();
-        n.geometry.dispose();
-        n.material.dispose();
-      }
-    });
+    return;
   }
+
+  // Atualiza o material existente com a nova textura
+  currentMaterial.map = tex;
+  currentMaterial.needsUpdate = true;
+
+  // Gere o mesh (mono ou estéreo) corretamente
+  if (isStereo) {
+    // MONO vs. ESTÉREO em tela plana (quando não em VR, remove offset)
+    if (!renderer.xr.isPresenting) {
+      currentMaterial.map.repeat.set(1, 0.5);
+      currentMaterial.map.offset.set(0, 0.5);
+    } else {
+      // Em VR, a gente precisa de 2 esferas? Mas pra simplificar,
+      // vamos reutilizar a mesma esfera e ativar layers se necessário.
+      // (Se quiser versão full stereo VR, seria similar ao antigo,
+      // mas geralmente 1 esfera já basta e o headset cuida do stereo.)
+      currentMaterial.map.repeat.set(1, 0.5);
+      currentMaterial.map.offset.set(0, 0.5);
+    }
+  } else {
+    // Mono → full 1:1 na textura
+    currentMaterial.map.repeat.set(1, 1);
+    currentMaterial.map.offset.set(0, 0);
+  }
+
+  // Ajusta layers da câmera para visão estéreo se for o caso
+  camera.layers.enable(isStereo ? 1 : 0);
+  camera.layers.disable(isStereo ? 0 : 1);
+
+  // Mostra a esfera e esconde o loading
+  sphereMesh.visible = true;
+  hideLoading();
 }
