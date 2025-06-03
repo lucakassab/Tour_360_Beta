@@ -17,33 +17,45 @@
       position:absolute;top:10px;left:10px;z-index:999;
       background:rgba(0,0,0,.5);color:#fff;
       padding:8px;border-radius:6px;
+      display:flex;
+      gap:8px;
+      align-items:center;
     }
     #menu label,#menu select,#menu button{
-      display:block;width:100%;margin-top:4px;
+      display:block;
+      font-size:14px;
+      color:#fff;
     }
-    #mediaSelect, #btnLoad{
-      padding:6px;font-size:14px;border-radius:4px;
-      border:none;cursor:pointer;text-align:center;
+    #mediaSelect {
+      padding:6px;
+      border-radius:4px;
+      border:none;
+      cursor:pointer;
+      min-width:150px;
     }
-    #btnLoad{
-      background:#28a745;color:#fff;
+    #prevBtn, #nextBtn {
+      padding:6px 10px;
+      font-size:14px;
+      border-radius:4px;
+      border:none;
+      cursor:pointer;
+      background:#007bff;
+      color:#fff;
     }
-    #btnLoad:hover{
-      background:#218838;
+    #prevBtn:hover, #nextBtn:hover {
+      background:#0056b3;
     }
   </style>
 </head>
 <body>
   <div id="menu">
-    <label for="mediaSelect">Escolha uma mídia:</label>
+    <label for="mediaSelect">Mídia:</label>
     <select id="mediaSelect"></select>
-    <button id="btnLoad">Carregar 360</button>
+    <button id="prevBtn">Anterior</button>
+    <button id="nextBtn">Próximo</button>
   </div>
 
-  <!-- 
-    IMPORT MAP: diz que qualquer "import ... from 'three'" deve usar exatamente 
-    essa URL do three.module.js
-  -->
+  <!-- importmap mantido para resolver 'three' -->
   <script type="importmap">
   {
     "imports": {
@@ -52,7 +64,6 @@
   }
   </script>
 
-  <!-- Continua carregando o loader.js normalmente -->
   <script type="module" src="js/loader.js"></script>
 </body>
 </html>

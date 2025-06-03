@@ -6,7 +6,7 @@
   let mediaModule = await import(isMobile ? './mobile.js' : './desktop.js');
   mediaModule.initialize();
 
-  // 2) Carrega a lista de mídias e preenche o select; só então chama mediaModule.loadMedia
+  // 2) Busca a lista de mídias no GitHub e preenche o <select>
   const GITHUB_API = 'https://api.github.com/repos/lucakassab/tour_360_beta/contents/media';
   const EXT = ['.jpg', '.png', '.mp4', '.webm', '.mov'];
   let mediaList = [];
@@ -38,7 +38,8 @@
     select.appendChild(opt);
   });
 
-  document.getElementById('btnLoad').addEventListener('click', () => {
+  // 3) Carrega a mídia sempre que o <select> mudar, sem botão extra
+  select.addEventListener('change', () => {
     const idx = parseInt(select.value);
     const opt = select.options[idx];
     if (!opt) return;
@@ -47,14 +48,35 @@
     mediaModule.loadMedia(url, stereo);
   });
 
+  // 4) Botões "Anterior" e "Próximo"
+  document.getElementById('prevBtn').addEventListener('click', () => {
+    const total = select.options.length;
+    if (!total) return;
+    let idx = parseInt(select.value);
+    idx = (idx - 1 + total) % total;
+    select.value = idx; // Isso dispara o change e carrega a mídia
+    const opt = select.options[idx];
+    mediaModule.loadMedia(opt.dataset.url, opt.dataset.stereo === 'true');
+  });
+
+  document.getElementById('nextBtn').addEventListener('click', () => {
+    const total = select.options.length;
+    if (!total) return;
+    let idx = parseInt(select.value);
+    idx = (idx + 1) % total;
+    select.value = idx; // dispara o change
+    const opt = select.options[idx];
+    mediaModule.loadMedia(opt.dataset.url, opt.dataset.stereo === 'true');
+  });
+
+  // 5) Carrega a primeira mídia por padrão (índice 0)
   if (mediaList.length) {
+    select.value = 0;
     const primeiro = select.options[0];
-    const url0     = primeiro.getAttribute('data-url');
-    const stereo0  = primeiro.getAttribute('data-stereo') === 'true';
-    mediaModule.loadMedia(url0, stereo0);
+    mediaModule.loadMedia(primeiro.dataset.url, primeiro.dataset.stereo === 'true');
   }
 
-  // 3) Só depois de ter carregado e exibido a mídia é que tentamos importar o módulo VR
+  // 6) Depois que já carregou tudo, tenta inicializar VR (com try/catch)
   if (navigator.xr && await navigator.xr.isSessionSupported?.('immersive-vr')) {
     try {
       const vrModule = await import('./vr.js');
