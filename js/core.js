@@ -25,9 +25,8 @@ async function getMediaList() {
     console.log('[CORE] Offline: listando no cache');
     const cache = await caches.open('tour360-v3');
     const keys  = await cache.keys();
-    const list = keys
-      .map(r => '.' + new URL(r.url).pathname)
-      .filter(p => p.includes('/media/'));
+    const list = keys.map(r => '.' + new URL(r.url).pathname)
+                     .filter(p => p.includes('/media/'));
     console.log('[CORE] Lista cache:', list);
     return list;
   }
@@ -60,13 +59,17 @@ function buildScene(src) {
   app.innerHTML = `
     <a-scene embedded ${xrSupported ? 'vr-mode-ui="enabled:true"' : ''}>
       <a-assets>
-        ${isVideo
-          ? `<video id="skyVid" src="${src}" autoplay loop muted playsinline crossorigin="anonymous"></video>`
-          : `<img id="skyTex" src="${src}" crossorigin="anonymous">`}
+        ${
+          isVideo
+            ? `<video id="skyVid" src="${src}" autoplay loop muted playsinline crossorigin="anonymous"></video>`
+            : `<img id="skyTex" src="${src}" crossorigin="anonymous">`
+        }
       </a-assets>
-      ${isVideo
-          ? `<a-videosphere src="#skyVid"></a-videosphere>`
-          : `<a-sky src="#skyTex"></a-sky>`}
+      ${
+        isVideo
+          ? `<a-videosphere src="#skyVid" material="side: double"></a-videosphere>`
+          : `<a-sky src="#skyTex" material="side: double"></a-sky>`
+      }
     </a-scene>
   `;
   const scene = document.querySelector('a-scene');
