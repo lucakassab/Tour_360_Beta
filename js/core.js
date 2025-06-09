@@ -9,32 +9,48 @@ function loadScript(src) {
   });
 }
 
+// busca lista de mídias online (GitHub API) ou offline (cache)
+async function getMediaList() {
+  if (navigator.onLine) {
+    const res = await fetch('https://api.github.com/repos/lucakassab/Tour_360_Beta/contents/media');
+    const data = await res.json();
+    return data.map(item => item.path); // ex: "media/img_02_mono.jpg"
+  } else {
+    const cache = await caches.open('tour360-v2');
+    const requests = await cache.keys();
+    return requests
+      .map(req => new URL(req.url).pathname.slice(1))
+      .filter(path => path.startsWith('media/'));
+  }
+}
+
 async function init() {
   // registra SW
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker
-      .register('./sw.js')
+      .register('./sw.js', { scope: './' })
       .catch(err => console.warn('SW falhou:', err));
   }
 
-  const isPWA       = window.matchMedia('(display-mode: standalone)').matches;
-  const isOffline   = !navigator.onLine;
   const xrSupported = navigator.xr && await navigator.xr.isSessionSupported('immersive-vr');
   const appDiv      = document.getElementById('app');
 
-  // caminhos das imagens
-  const IMG_MONO   = './media/img_02_mono.jpg';
-  const IMG_STEREO = './media/img_01_stereo.jpg';
+  // pega lista dinâmica de mídia
+  const mediaList = await getMediaList();
+  const monoList   = mediaList.filter(p => p.includes('_mono'));
+  const stereoList = mediaList.filter(p => p.includes('_stereo'));
+  if (!monoList.length || !stereoList.length) {
+    console.error('Sem médias mono ou estéreo disponíveis:', mediaList);
+    return;
+  }
 
-  // imagem inicial (mono sempre)
-  let currentSrc = IMG_MONO;
+  let currentSrc = monoList[0]; // carrega primeiro mono disponível
 
-  // monta a-scene
+  // monta a cena A-Frame
   const scene = document.createElement('a-scene');
   scene.setAttribute('embedded', '');
   if (xrSupported) scene.setAttribute('vr-mode-ui', 'enabled: true');
 
-  // assets
   const assets = document.createElement('a-assets');
   const imgEl  = document.createElement('img');
   imgEl.id     = 'skyTex';
@@ -42,16 +58,16 @@ async function init() {
   assets.appendChild(imgEl);
   scene.appendChild(assets);
 
-  // sky
   const sky = document.createElement('a-sky');
   sky.setAttribute('src', '#skyTex');
   scene.appendChild(sky);
 
   appDiv.appendChild(scene);
 
-  // ao entrar em VR troca pra estéreo e carrega controles
+  // ao entrar em VR, troca pra estéreo e carrega controles
   scene.addEventListener('enter-vr', async () => {
-    imgEl.src = IMG_STEREO;
+    currentSrc = stereoList[0];
+    imgEl.src = currentSrc;
     sky.setAttribute('stereo', '');
     try {
       await loadScript('js/motionControllers.js');
