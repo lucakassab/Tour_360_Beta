@@ -1,110 +1,14 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="utf-8" />
-  <title>Tour360 – Visualizador 360°</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-  <!-- Favicon -->
-  <link rel="icon" href="icons/favicon.ico" type="image/x-icon">
-  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#000000" />
-
-  <style>
-    /* bloqueia seleção e overlay azul */
-    html, body {
-      -webkit-user-select: none;
-      -ms-user-select: none;
-      user-select: none;
-      overscroll-behavior: none;
-      touch-action: none;
-      margin: 0; overflow: hidden; background: #000; font-family: sans-serif;
-    }
-    * { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
-
-    /* menu, botões etc */
-    #menu {
-      position: absolute; top: 10px; left: 10px; z-index: 999;
-      background: rgba(0,0,0,.5); color: #fff;
-      padding: 8px; border-radius: 6px;
-      display: flex; gap: 8px; align-items: center;
-    }
-    #menu label, #menu select, #menu button { font-size: 14px; color: #fff }
-    #mediaSelect {
-      padding: 6px; border-radius: 4px; border: none; cursor: pointer;
-      min-width: 150px; background: #222; color: #fff;
-    }
-    #prevBtn, #nextBtn {
-      padding: 6px 10px; font-size: 14px; border-radius: 4px;
-      border: none; cursor: pointer;
-      background: #007bff; color: #fff;
-    }
-    #prevBtn:hover, #nextBtn:hover { background: #0056b3 }
-    canvas { touch-action: none }
-
-    /* alerta temporário */
-    #mode-alert {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.8);
-      color: #fff;
-      padding: 12px 24px;
-      border-radius: 6px;
-      font-size: 16px;
-      z-index: 10000;
-      opacity: 0;
-      transition: opacity 0.2s;
-    }
-  </style>
+  <link rel="icon" href="icons/icon-192.png">
+  <title>Tour 360°</title>
 </head>
 <body>
-  <div id="menu">
-    <label for="mediaSelect">Mídia:</label>
-    <select id="mediaSelect"></select>
-    <button id="prevBtn">Anterior</button>
-    <button id="nextBtn">Próximo</button>
-  </div>
-
-  <!-- alerta para mostrar modo (apenas 1s) -->
-  <div id="mode-alert"></div>
-
-  <!-- Mapa de importação pros módulos -->
-  <script type="importmap">
-  { "imports": { "three": "https://unpkg.com/three@0.158.0/build/three.module.js" } }
-  </script>
-  <script type="module" src="js/loader.js"></script>
-
-  <!-- Registro do Service Worker + detecção do modo standalone -->
-  <script>
-    // Registra o Service Worker
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker
-        .register("./sw.js")
-        .then(() => console.log("✅ Service Worker registrado!"))
-        .catch(err => console.warn("❌ SW falhou:", err));
-    }
-
-    // Detecta modo standalone ou navegador normal
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true;
-
-    // Prepara mensagem
-    const alertDiv = document.getElementById('mode-alert');
-    alertDiv.textContent = isStandalone
-      ? "Rodando como app instalado (PWA)"
-      : "Rodando no navegador normal";
-
-    // Exibe por 1 segundo
-    requestAnimationFrame(() => {
-      alertDiv.style.opacity = "1";
-      setTimeout(() => {
-        alertDiv.style.opacity = "0";
-      }, 1000);
-    });
-  </script>
+  <div id="app"></div>
+  <script src="js/core.js"></script>
 </body>
 </html>
