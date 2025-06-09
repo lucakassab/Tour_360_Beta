@@ -1,5 +1,5 @@
-const CACHE_NAME = 'tour360-v2';
-const ASSETS = [
+const CACHE_NAME = 'tour360-v3';
+const STATIC_ASSETS = [
   './',
   './index.html',
   './manifest.json',
@@ -11,14 +11,34 @@ const ASSETS = [
   './js/aframe.min.js',
   './js/aframe-stereo-component.min.js',
   './js/core.js',
-  './js/motionControllers.js',
-  './media/img_01_stereo.jpg',
-  './media/img_02_mono.jpg'
+  './js/motionControllers.js'
 ];
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll(ASSETS)));
+self.addEventListener('install', evt => {
+  evt.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(STATIC_ASSETS))
+  );
 });
-self.addEventListener('fetch', e => {
-  e.respondWith(caches.match(e.request).then(r => r || fetch(e.request)));
+
+self.addEventListener('fetch', evt => {
+  const url = new URL(evt.request.url);
+  // se for mídia, tenta do cache, senão fetch e cacheia
+  if (url.pathname.includes('/media/')) {
+    evt.respondWith(
+      caches.match(evt.request).then(cached => {
+        if (cached) return cached;
+        return fetch(evt.request).then(res => {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then(c => c.put(evt.request, copy));
+          return res;
+        });
+      })
+    );
+  } else {
+    // assets estáticos
+    evt.respondWith(
+      caches.match(evt.request).then(cached => cached || fetch(evt.request))
+    );
+  }
 });

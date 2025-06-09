@@ -19,7 +19,7 @@ AFRAME.registerComponent('motion-controls-box', {
 window.addEventListener('load', () => {
   const scene = document.querySelector('a-scene');
   if (!scene) return;
-  ['left', 'right'].forEach(hand => {
+  ['left','right'].forEach(hand => {
     const ctrl = document.createElement('a-entity');
     ctrl.setAttribute('hand-controls', `hand: ${hand}`);
     ctrl.setAttribute('motion-controls-box', `hand: ${hand}`);
