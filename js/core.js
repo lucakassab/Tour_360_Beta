@@ -1,61 +1,94 @@
-// carrega um script e retorna Promise
+console.log('[CORE] Início do core.js');
+
 function loadScript(src) {
+  console.log(`[CORE] Carregando script: ${src}`);
   return new Promise((res, rej) => {
     const s = document.createElement('script');
     s.src = src;
-    s.onload = () => res();
-    s.onerror = () => rej(`Erro ao carregar ${src}`);
+    s.onload = () => {
+      console.log(`[CORE] Script carregado: ${src}`);
+      res();
+    };
+    s.onerror = (e) => {
+      console.error(`[CORE] Erro ao carregar script: ${src}`, e);
+      rej(e);
+    };
     document.head.appendChild(s);
   });
 }
 
-// busca mídias via GitHub API ou cache
 async function getMediaList() {
+  console.log('[CORE] getMediaList()');
   if (navigator.onLine) {
+    console.log('[CORE] Online: buscando lista no GitHub');
     const res = await fetch('https://api.github.com/repos/lucakassab/Tour_360_Beta/contents/media');
-    if (!res.ok) throw 'GitHub API falhou';
+    if (!res.ok) {
+      console.error('[CORE] GitHub API retornou erro:', res.status);
+      throw 'GitHub API falhou';
+    }
     const data = await res.json();
-    return data.map(item => item.path.replace('media/', './media/'));
+    const paths = data.map(item => item.path.replace('media/', './media/'));
+    console.log('[CORE] Lista obtida do GitHub:', paths);
+    return paths;
   } else {
+    console.log('[CORE] Offline: listando do cache');
     const cache = await caches.open('tour360-v3');
     const requests = await cache.keys();
-    return requests
+    const paths = requests
       .map(r => new URL(r.url).pathname)
       .filter(p => p.match(/\/media\//))
       .map(p => '.' + p);
+    console.log('[CORE] Lista obtida do cache:', paths);
+    return paths;
   }
 }
 
 async function init() {
+  console.log('[CORE] init() iniciado');
+
   // registra SW
   if ('serviceWorker' in navigator) {
+    console.log('[CORE] Registrando Service Worker');
     navigator.serviceWorker
       .register('./sw.js', { scope: './' })
-      .catch(e => console.warn('SW falhou:', e));
+      .then(() => console.log('[CORE] SW registrado com sucesso'))
+      .catch(e => console.warn('[CORE] SW falhou:', e));
+  } else {
+    console.warn('[CORE] Service Worker não suportado');
   }
 
-  const xrSupported = navigator.xr && await navigator.xr.isSessionSupported('immersive-vr');
-  const appDiv      = document.getElementById('app');
   let mediaList;
   try {
     mediaList = await getMediaList();
   } catch (e) {
-    console.error('Erro ao listar mídias:', e);
+    console.error('[CORE] Falha ao obter mediaList:', e);
     return;
   }
+  
+  const monoList   = mediaList.filter(p => /(?:_|-|\\b)mono\\./i.test(p));
+  const stereoList = mediaList.filter(p => /(?:_|-|\\b)stereo\\./i.test(p));
+  console.log('[CORE] monoList:', monoList);
+  console.log('[CORE] stereoList:', stereoList);
 
-  // filtra mono/stereo (case-insensitive)
-  const monoList   = mediaList.filter(p => /(?:_|-|\b)mono\./i.test(p));
-  const stereoList = mediaList.filter(p => /(?:_|-|\b)stereo\./i.test(p));
   if (!monoList.length || !stereoList.length) {
-    console.error('Sem mídias mono ou estéreo disponíveis:', mediaList);
+    console.error('[CORE] Sem mídias mono ou estéreo disponíveis');
     return;
   }
 
-  // função que monta cena com o src dado
+  const xrSupported = navigator.xr && await navigator.xr.isSessionSupported('immersive-vr');
+  console.log('[CORE] XR suportado?', xrSupported);
+
+  const appDiv = document.getElementById('app');
+  if (!appDiv) {
+    console.error('[CORE] <div id="app"> não encontrado');
+    return;
+  }
+
   function buildScene(src, isVideo) {
+    console.log(`[CORE] buildScene -> src: ${src} | isVideo: ${isVideo}`);
     appDiv.innerHTML = '';
-    const scene  = document.createElement('a-scene');
+
+    const scene = document.createElement('a-scene');
     scene.setAttribute('embedded', '');
     if (xrSupported) scene.setAttribute('vr-mode-ui', 'enabled: true');
 
@@ -63,54 +96,63 @@ async function init() {
     let assetEl, skyEl;
 
     if (isVideo) {
+      console.log('[CORE] Criando videoSphere');
       assetEl = document.createElement('video');
       assetEl.setAttribute('id', 'skyVid');
       assetEl.setAttribute('loop', '');
       assetEl.setAttribute('autoplay', '');
       assetEl.setAttribute('crossorigin', 'anonymous');
-      assetEl.src = src;
       skyEl = document.createElement('a-videosphere');
-      skyEl.setAttribute('src', '#skyVid');
     } else {
+      console.log('[CORE] Criando sky');
       assetEl = document.createElement('img');
       assetEl.setAttribute('id', 'skyTex');
-      assetEl.src = src;
       skyEl = document.createElement('a-sky');
-      skyEl.setAttribute('src', '#skyTex');
     }
 
+    assetEl.src = src;
+    assetEl.addEventListener('error', e => console.error('[CORE] Erro carregando asset:', e));
+    assetEl.addEventListener('load', () => console.log('[CORE] Asset carregado:', src));
+
+    // monta cena
     assets.appendChild(assetEl);
     scene.appendChild(assets);
+    skyEl.setAttribute('src', isVideo ? '#skyVid' : '#skyTex');
     scene.appendChild(skyEl);
     appDiv.appendChild(scene);
 
-    // ao entrar em VR, recarrega cena com estéreo
+    // evento VR
     scene.addEventListener('enter-vr', async () => {
+      console.log('[CORE] enter-vr');
       const stereoSrc = stereoList[0];
       const ext = stereoSrc.split('.').pop().toLowerCase();
-      const stereoIsVideo = ext === 'mp4' || ext === 'webm';
+      const stereoIsVideo = ['mp4','webm'].includes(ext);
+      console.log('[CORE] stereoIsVideo?', stereoIsVideo);
       assetEl.src = stereoSrc;
+
       if (!isVideo && stereoIsVideo) {
-        // trocar img→video: recarrega tudo
+        console.log('[CORE] Rebuild scene para vídeo estéreo');
         buildScene(stereoSrc, true);
       } else {
-        // só adiciona componente estéreo
+        console.log('[CORE] Adicionando componente estéreo');
         skyEl.setAttribute('stereo', '');
       }
-      try { await loadScript('js/motionControllers.js'); }
-      catch(e){ console.warn(e); }
+
+      try {
+        await loadScript('js/motionControllers.js');
+      } catch(e) {
+        console.warn('[CORE] Falha ao carregar motionControllers', e);
+      }
     });
   }
 
-  // escolhe primeiro mono
+  // inicia com mono
   const monoSrc = monoList[0];
   const ext     = monoSrc.split('.').pop().toLowerCase();
-  const isVid   = ext === 'mp4' || ext === 'webm';
-  buildScene(monoSrc, isVid);
+  buildScene(monoSrc, ['mp4','webm'].includes(ext));
 }
 
-// carrega A-Frame → plugin estéreo → init
 loadScript('js/aframe.min.js')
   .then(() => loadScript('js/aframe-stereo-component.min.js'))
   .then(init)
-  .catch(err => console.error(err));
+  .catch(err => console.error('[CORE] Erro JS inicial:', err));
