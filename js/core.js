@@ -49,9 +49,8 @@ let monoList = [], stereoList = [];
 let xrSupported = false;
 
 function filterLists(mediaList) {
-  const lower = mediaList.map(p => p.toLowerCase());
-  monoList   = mediaList.filter((p,i) => lower[i].includes('mono.'));
-  stereoList = mediaList.filter((p,i) => lower[i].includes('stereo.'));
+  monoList   = mediaList.filter(p => p.toLowerCase().includes('mono.'));
+  stereoList = mediaList.filter(p => p.toLowerCase().includes('stereo.'));
   console.log('[CORE] monoList:', monoList);
   console.log('[CORE] stereoList:', stereoList);
 }
@@ -74,8 +73,8 @@ function buildScene(src) {
   appDiv.innerHTML = '';
 
   const scene = document.createElement('a-scene');
-  scene.setAttribute('embedded','');
-  if (xrSupported) scene.setAttribute('vr-mode-ui','enabled:true');
+  scene.setAttribute('embedded', '');
+  if (xrSupported) scene.setAttribute('vr-mode-ui', 'enabled:true');
 
   const assets = document.createElement('a-assets');
   let assetEl, skyEl;
@@ -83,21 +82,21 @@ function buildScene(src) {
   if (isVideo) {
     console.log('[CORE] Criando videoSphere');
     assetEl = document.createElement('video');
-    assetEl.setAttribute('id','skyVid');
-    assetEl.setAttribute('loop','');
-    assetEl.setAttribute('autoplay','');
-    assetEl.setAttribute('crossorigin','anonymous');
+    assetEl.setAttribute('id', 'skyVid');
+    assetEl.setAttribute('loop', '');
+    assetEl.setAttribute('autoplay', '');
+    assetEl.setAttribute('crossorigin', 'anonymous');
     skyEl = document.createElement('a-videosphere');
   } else {
     console.log('[CORE] Criando sky');
     assetEl = document.createElement('img');
-    assetEl.setAttribute('id','skyTex');
+    assetEl.setAttribute('id', 'skyTex');
     skyEl = document.createElement('a-sky');
   }
 
   assetEl.src = src;
-  assetEl.addEventListener('error',e => console.error('[CORE] Erro asset:',e));
-  assetEl.addEventListener('load',() => console.log('[CORE] Asset carregado:',src));
+  assetEl.addEventListener('error', e => console.error('[CORE] Erro asset:', e));
+  assetEl.addEventListener('load', () => console.log('[CORE] Asset carregado:', src));
 
   assets.appendChild(assetEl);
   scene.appendChild(assets);
@@ -116,16 +115,56 @@ function buildScene(src) {
       buildScene(stereoSrc);
     } else {
       console.log('[CORE] Adicionando componente estéreo');
-      skyEl.setAttribute('stereo','');
+      skyEl.setAttribute('stereo', '');
     }
     try {
       await loadScript('js/motionControllers.js');
-    } catch(e) {
-      console.warn('[CORE] motionControllers falhou',e);
+    } catch (e) {
+      console.warn('[CORE] motionControllers falhou', e);
     }
   });
 }
 
 async function init() {
   console.log('[CORE] init()');
-  if ('serviceWorker' i
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker
+      .register('./sw.js', { scope: './' })
+      .then(() => console.log('[CORE] SW registrado'))
+      .catch(e => console.warn('[CORE] SW falhou', e));
+  }
+
+  xrSupported = navigator.xr && await navigator.xr.isSessionSupported('immersive-vr');
+  console.log('[CORE] XR suportado?', xrSupported);
+
+  let mediaList;
+  try {
+    mediaList = await getMediaList();
+  } catch (e) {
+    console.error('[CORE] getMediaList falhou', e);
+    return;
+  }
+
+  filterLists(mediaList);
+  if (!monoList.length || !stereoList.length) {
+    console.error('[CORE] Sem mídias mono ou estéreo');
+    return;
+  }
+
+  populateDropdown(mediaList);
+
+  const sel = document.getElementById('mediaSelector');
+  sel.addEventListener('change', e => {
+    console.log('[CORE] mediaSelector change:', e.target.value);
+    buildScene(e.target.value);
+  });
+
+  // carrega o primeiro mono por padrão
+  sel.value = monoList[0];
+  buildScene(monoList[0]);
+}
+
+loadScript('js/aframe.min.js')
+  .then(() => loadScript('js/aframe-stereo-component.min.js'))
+  .then(init)
+  .catch(err => console.error('[CORE] Erro inicial:', err));
