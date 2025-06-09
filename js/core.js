@@ -18,14 +18,18 @@ async function getMediaList() {
     const res = await fetch('https://api.github.com/repos/lucakassab/Tour_360_Beta/contents/media');
     if (!res.ok) throw `[CORE] GitHub API falhou: ${res.status}`;
     const data = await res.json();
-    return data.map(item => './media/' + item.name);
+    const list = data.map(item => './media/' + item.name);
+    console.log('[CORE] Lista GitHub:', list);
+    return list;
   } else {
-    console.log('[CORE] Offline: listando do cache');
-    const cache     = await caches.open('tour360-v3');
-    const requests  = await cache.keys();
-    return requests
+    console.log('[CORE] Offline: listando no cache');
+    const cache = await caches.open('tour360-v3');
+    const keys  = await cache.keys();
+    const list = keys
       .map(r => '.' + new URL(r.url).pathname)
       .filter(p => p.includes('/media/'));
+    console.log('[CORE] Lista cache:', list);
+    return list;
   }
 }
 
@@ -42,104 +46,72 @@ function populateDropdown(list) {
   const sel = document.getElementById('mediaSelector');
   sel.innerHTML = '';
   list.forEach(p => {
-    const o = document.createElement('option');
-    o.value = p;
-    o.text  = p.split('/').pop();
-    sel.appendChild(o);
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.text  = p.split('/').pop();
+    sel.appendChild(opt);
   });
 }
 
 function buildScene(src) {
   const isVideo = /\.(mp4|webm)$/i.test(src);
-  console.log(`[CORE] buildScene → ${src} | video? ${isVideo}`);
+  console.log(`[CORE] buildScene → src: ${src} | isVideo: ${isVideo}`);
   const app = document.getElementById('app');
-  app.innerHTML = '';
-
-  const scene  = document.createElement('a-scene');
-  scene.setAttribute('embedded', '');
-  if (xrSupported) scene.setAttribute('vr-mode-ui', 'enabled: true');
-
-  const assets = document.createElement('a-assets');
-  let asset, sky;
-
-  if (isVideo) {
-    asset = document.createElement('video');
-    asset.id = 'skyVid';
-    asset.muted = true;
-    asset.loop  = true;
-    asset.preload = 'auto';
-    asset.playsInline = true;
-    asset.setAttribute('crossorigin', 'anonymous');
-    sky = document.createElement('a-videosphere');
-    sky.setAttribute('src', '#skyVid');
-
-    asset.addEventListener('canplaythrough', () => {
-      console.log('[CORE] Vídeo pronto – play()');
-      asset.play().catch(e => console.warn('[CORE] autoplay bloqueado', e));
-    });
-  } else {
-    asset = document.createElement('img');
-    asset.id = 'skyTex';
-    asset.setAttribute('crossorigin', 'anonymous');
-    sky = document.createElement('a-sky');
-
-    asset.addEventListener('load', () => {
-      console.log('[CORE] Imagem carregada:', src);
-      sky.setAttribute('material', 'src:#skyTex');
-    });
-  }
-
-  asset.src = src;
-  asset.addEventListener('error', e => console.error('[CORE] Falha asset:', e));
-
-  assets.appendChild(asset);
-  scene.appendChild(assets);
-  if (!isVideo) sky.setAttribute('src', '#skyTex');
-  scene.appendChild(sky);
-  app.appendChild(scene);
-
-  scene.addEventListener('enter-vr', async () => {
+  app.innerHTML = `
+    <a-scene embedded ${xrSupported ? 'vr-mode-ui="enabled:true"' : ''}>
+      <a-assets>
+        ${isVideo
+          ? `<video id="skyVid" src="${src}" autoplay loop muted playsinline crossorigin="anonymous"></video>`
+          : `<img id="skyTex" src="${src}" crossorigin="anonymous">`}
+      </a-assets>
+      ${isVideo
+          ? `<a-videosphere src="#skyVid"></a-videosphere>`
+          : `<a-sky src="#skyTex"></a-sky>`}
+    </a-scene>
+  `;
+  const scene = document.querySelector('a-scene');
+  scene.addEventListener('loaded', () => console.log('[CORE] cena carregada'));
+  scene.addEventListener('enter-vr', () => {
     console.log('[CORE] enter-vr');
     const stereoSrc = stereoList[0];
     if (!stereoSrc) return;
-
-    const stereoIsVid = /\.(mp4|webm)$/i.test(stereoSrc);
-    console.log('[CORE] Stereo vídeo?', stereoIsVid);
-    asset.src = stereoSrc;
-
-    if (!isVideo && stereoIsVid) buildScene(stereoSrc);
-    else sky.setAttribute('stereo', '');
-
-    try { await loadScript('js/motionControllers.js'); }
-    catch (e) { console.warn('[CORE] motionControllers falhou', e); }
+    console.log('[CORE] carregando estéreo:', stereoSrc);
+    if (/\.(mp4|webm)$/i.test(stereoSrc)) {
+      buildScene(stereoSrc);
+    } else {
+      const imgEl = document.querySelector('#skyTex');
+      if (imgEl) imgEl.src = stereoSrc;
+      const skyEl = document.querySelector('a-sky');
+      if (skyEl) skyEl.setAttribute('stereo', '');
+    }
+    loadScript('js/motionControllers.js')
+      .catch(e => console.warn('[CORE] motionControllers falhou', e));
   });
 }
 
 async function init() {
   console.log('[CORE] init()');
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js', { scope: './' })
+    navigator.serviceWorker
+      .register('./sw.js', { scope: './' })
       .then(() => console.log('[CORE] SW registrado'))
-      .catch(e  => console.warn('[CORE] SW falhou', e));
+      .catch(e => console.warn('[CORE] SW falhou', e));
   }
-
   xrSupported = navigator.xr && await navigator.xr.isSessionSupported('immersive-vr');
   console.log('[CORE] XR suportado?', xrSupported);
 
-  let list;
-  try { list = await getMediaList(); }
+  let mediaList;
+  try { mediaList = await getMediaList(); }
   catch (e) { console.error('[CORE] getMediaList falhou', e); return; }
 
-  filterLists(list);
+  filterLists(mediaList);
   if (!monoList.length || !stereoList.length) {
     console.error('[CORE] Sem mídias mono ou estéreo'); return;
   }
 
-  populateDropdown(list);
-
+  populateDropdown(mediaList);
   const sel = document.getElementById('mediaSelector');
   sel.addEventListener('change', e => buildScene(e.target.value));
-
   sel.value = monoList[0];
   buildScene(monoList[0]);
 }

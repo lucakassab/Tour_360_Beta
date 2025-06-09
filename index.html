@@ -9,30 +9,40 @@
   <style>
     body {
       margin: 0;
-      height: 100vh;
       overflow: hidden;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       background: #000;
+      position: relative;
+      height: 100vh;
     }
     #controls {
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%);
-      background: rgba(0,0,0,0.6);
-      padding: 10px 15px;
-      border-radius: 6px;
+      transform: translate(-50%,-50%);
+      background: rgba(0,0,0,0.7);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 10;
     }
     #mediaSelector {
       font-size: 16px;
-      padding: 4px 6px;
+      padding: 5px;
+      background: #222;
+      color: #fff;
+      border: 1px solid #555;
+      border-radius: 4px;
+    }
+    a-scene {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
     }
   </style>
 </head>
 <body>
   <div id="controls">
+    <label for="mediaSelector" style="color:#fff; margin-right:8px;">Escolha mídia:</label>
     <select id="mediaSelector"></select>
   </div>
   <div id="app"></div>
