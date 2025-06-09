@@ -46,15 +46,12 @@ async function getMediaList() {
 async function init() {
   console.log('[CORE] init() iniciado');
 
-  // registra SW
   if ('serviceWorker' in navigator) {
     console.log('[CORE] Registrando Service Worker');
     navigator.serviceWorker
       .register('./sw.js', { scope: './' })
       .then(() => console.log('[CORE] SW registrado com sucesso'))
       .catch(e => console.warn('[CORE] SW falhou:', e));
-  } else {
-    console.warn('[CORE] Service Worker não suportado');
   }
 
   let mediaList;
@@ -64,9 +61,11 @@ async function init() {
     console.error('[CORE] Falha ao obter mediaList:', e);
     return;
   }
-  
-  const monoList   = mediaList.filter(p => /(?:_|-|\\b)mono\\./i.test(p));
-  const stereoList = mediaList.filter(p => /(?:_|-|\\b)stereo\\./i.test(p));
+
+  // FILTRO CORRIGIDO: usa includes em vez da regex que não bateu
+  const lowerList = mediaList.map(p => p.toLowerCase());
+  const monoList   = mediaList.filter((p, i) => lowerList[i].includes('mono.'));
+  const stereoList = mediaList.filter((p, i) => lowerList[i].includes('stereo.'));
   console.log('[CORE] monoList:', monoList);
   console.log('[CORE] stereoList:', stereoList);
 
@@ -114,14 +113,12 @@ async function init() {
     assetEl.addEventListener('error', e => console.error('[CORE] Erro carregando asset:', e));
     assetEl.addEventListener('load', () => console.log('[CORE] Asset carregado:', src));
 
-    // monta cena
     assets.appendChild(assetEl);
     scene.appendChild(assets);
     skyEl.setAttribute('src', isVideo ? '#skyVid' : '#skyTex');
     scene.appendChild(skyEl);
     appDiv.appendChild(scene);
 
-    // evento VR
     scene.addEventListener('enter-vr', async () => {
       console.log('[CORE] enter-vr');
       const stereoSrc = stereoList[0];
@@ -146,7 +143,6 @@ async function init() {
     });
   }
 
-  // inicia com mono
   const monoSrc = monoList[0];
   const ext     = monoSrc.split('.').pop().toLowerCase();
   buildScene(monoSrc, ['mp4','webm'].includes(ext));
