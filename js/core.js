@@ -5,14 +5,8 @@ function loadScript(src) {
   return new Promise((res, rej) => {
     const s = document.createElement('script');
     s.src = src;
-    s.onload = () => {
-      console.log(`[CORE] Script carregado: ${src}`);
-      res();
-    };
-    s.onerror = e => {
-      console.error(`[CORE] Erro ao carregar script: ${src}`, e);
-      rej(e);
-    };
+    s.onload = () => { console.log(`[CORE] Script carregado: ${src}`); res(); };
+    s.onerror = e => { console.error(`[CORE] Erro ao carregar script: ${src}`, e); rej(e); };
     document.head.appendChild(s);
   });
 }
@@ -21,145 +15,131 @@ async function getMediaList() {
   console.log('[CORE] getMediaList()');
   if (navigator.onLine) {
     console.log('[CORE] Online: buscando lista no GitHub');
-    const res = await fetch(
-      'https://api.github.com/repos/lucakassab/Tour_360_Beta/contents/media'
-    );
-    if (!res.ok) {
-      console.error('[CORE] GitHub API retornou erro:', res.status);
-      throw 'GitHub API falhou';
-    }
+    const res = await fetch('https://api.github.com/repos/lucakassab/Tour_360_Beta/contents/media');
+    if (!res.ok) throw `[CORE] GitHub API falhou: ${res.status}`;
     const data = await res.json();
-    const paths = data.map(item => './media/' + item.name);
-    console.log('[CORE] Lista GitHub:', paths);
-    return paths;
+    return data.map(item => './media/' + item.name);
   } else {
     console.log('[CORE] Offline: listando do cache');
-    const cache = await caches.open('tour360-v3');
-    const requests = await cache.keys();
-    const paths = requests
-      .map(r => new URL(r.url).pathname)
-      .filter(p => p.includes('/media/'))
-      .map(p => '.' + p);
-    console.log('[CORE] Lista cache:', paths);
-    return paths;
+    const cache     = await caches.open('tour360-v3');
+    const requests  = await cache.keys();
+    return requests
+      .map(r => '.' + new URL(r.url).pathname)
+      .filter(p => p.includes('/media/'));
   }
 }
 
-let monoList = [], stereoList = [];
-let xrSupported = false;
+let monoList = [], stereoList = [], xrSupported = false;
 
-function filterLists(mediaList) {
-  monoList   = mediaList.filter(p => p.toLowerCase().includes('mono.'));
-  stereoList = mediaList.filter(p => p.toLowerCase().includes('stereo.'));
+function filterLists(list) {
+  monoList   = list.filter(p => p.toLowerCase().includes('mono.'));
+  stereoList = list.filter(p => p.toLowerCase().includes('stereo.'));
   console.log('[CORE] monoList:', monoList);
   console.log('[CORE] stereoList:', stereoList);
 }
 
-function populateDropdown(mediaList) {
+function populateDropdown(list) {
   const sel = document.getElementById('mediaSelector');
   sel.innerHTML = '';
-  mediaList.forEach(path => {
-    const opt = document.createElement('option');
-    opt.value = path;
-    opt.text  = path.split('/').pop();
-    sel.appendChild(opt);
+  list.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p;
+    o.text  = p.split('/').pop();
+    sel.appendChild(o);
   });
 }
 
 function buildScene(src) {
   const isVideo = /\.(mp4|webm)$/i.test(src);
-  console.log(`[CORE] buildScene -> src: ${src} | isVideo: ${isVideo}`);
-  const appDiv = document.getElementById('app');
-  appDiv.innerHTML = '';
+  console.log(`[CORE] buildScene → ${src} | video? ${isVideo}`);
+  const app = document.getElementById('app');
+  app.innerHTML = '';
 
-  const scene = document.createElement('a-scene');
+  const scene  = document.createElement('a-scene');
   scene.setAttribute('embedded', '');
-  if (xrSupported) scene.setAttribute('vr-mode-ui', 'enabled:true');
+  if (xrSupported) scene.setAttribute('vr-mode-ui', 'enabled: true');
 
   const assets = document.createElement('a-assets');
-  let assetEl, skyEl;
+  let asset, sky;
 
   if (isVideo) {
-    console.log('[CORE] Criando videoSphere');
-    assetEl = document.createElement('video');
-    assetEl.setAttribute('id', 'skyVid');
-    assetEl.setAttribute('loop', '');
-    assetEl.setAttribute('autoplay', '');
-    assetEl.setAttribute('crossorigin', 'anonymous');
-    skyEl = document.createElement('a-videosphere');
+    asset = document.createElement('video');
+    asset.id = 'skyVid';
+    asset.muted = true;
+    asset.loop  = true;
+    asset.preload = 'auto';
+    asset.playsInline = true;
+    asset.setAttribute('crossorigin', 'anonymous');
+    sky = document.createElement('a-videosphere');
+    sky.setAttribute('src', '#skyVid');
+
+    asset.addEventListener('canplaythrough', () => {
+      console.log('[CORE] Vídeo pronto – play()');
+      asset.play().catch(e => console.warn('[CORE] autoplay bloqueado', e));
+    });
   } else {
-    console.log('[CORE] Criando sky');
-    assetEl = document.createElement('img');
-    assetEl.setAttribute('id', 'skyTex');
-    skyEl = document.createElement('a-sky');
+    asset = document.createElement('img');
+    asset.id = 'skyTex';
+    asset.setAttribute('crossorigin', 'anonymous');
+    sky = document.createElement('a-sky');
+
+    asset.addEventListener('load', () => {
+      console.log('[CORE] Imagem carregada:', src);
+      sky.setAttribute('material', 'src:#skyTex');
+    });
   }
 
-  assetEl.src = src;
-  assetEl.addEventListener('error', e => console.error('[CORE] Erro asset:', e));
-  assetEl.addEventListener('load', () => console.log('[CORE] Asset carregado:', src));
+  asset.src = src;
+  asset.addEventListener('error', e => console.error('[CORE] Falha asset:', e));
 
-  assets.appendChild(assetEl);
+  assets.appendChild(asset);
   scene.appendChild(assets);
-  skyEl.setAttribute('src', isVideo ? '#skyVid' : '#skyTex');
-  scene.appendChild(skyEl);
-  appDiv.appendChild(scene);
+  if (!isVideo) sky.setAttribute('src', '#skyTex');
+  scene.appendChild(sky);
+  app.appendChild(scene);
 
   scene.addEventListener('enter-vr', async () => {
     console.log('[CORE] enter-vr');
     const stereoSrc = stereoList[0];
-    const stereoIsVideo = /\.(mp4|webm)$/i.test(stereoSrc);
-    console.log('[CORE] stereoIsVideo?', stereoIsVideo);
-    assetEl.src = stereoSrc;
-    if (!isVideo && stereoIsVideo) {
-      console.log('[CORE] Rebuild para vídeo estéreo');
-      buildScene(stereoSrc);
-    } else {
-      console.log('[CORE] Adicionando componente estéreo');
-      skyEl.setAttribute('stereo', '');
-    }
-    try {
-      await loadScript('js/motionControllers.js');
-    } catch (e) {
-      console.warn('[CORE] motionControllers falhou', e);
-    }
+    if (!stereoSrc) return;
+
+    const stereoIsVid = /\.(mp4|webm)$/i.test(stereoSrc);
+    console.log('[CORE] Stereo vídeo?', stereoIsVid);
+    asset.src = stereoSrc;
+
+    if (!isVideo && stereoIsVid) buildScene(stereoSrc);
+    else sky.setAttribute('stereo', '');
+
+    try { await loadScript('js/motionControllers.js'); }
+    catch (e) { console.warn('[CORE] motionControllers falhou', e); }
   });
 }
 
 async function init() {
   console.log('[CORE] init()');
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker
-      .register('./sw.js', { scope: './' })
+    navigator.serviceWorker.register('./sw.js', { scope: './' })
       .then(() => console.log('[CORE] SW registrado'))
-      .catch(e => console.warn('[CORE] SW falhou', e));
+      .catch(e  => console.warn('[CORE] SW falhou', e));
   }
 
   xrSupported = navigator.xr && await navigator.xr.isSessionSupported('immersive-vr');
   console.log('[CORE] XR suportado?', xrSupported);
 
-  let mediaList;
-  try {
-    mediaList = await getMediaList();
-  } catch (e) {
-    console.error('[CORE] getMediaList falhou', e);
-    return;
-  }
+  let list;
+  try { list = await getMediaList(); }
+  catch (e) { console.error('[CORE] getMediaList falhou', e); return; }
 
-  filterLists(mediaList);
+  filterLists(list);
   if (!monoList.length || !stereoList.length) {
-    console.error('[CORE] Sem mídias mono ou estéreo');
-    return;
+    console.error('[CORE] Sem mídias mono ou estéreo'); return;
   }
 
-  populateDropdown(mediaList);
+  populateDropdown(list);
 
   const sel = document.getElementById('mediaSelector');
-  sel.addEventListener('change', e => {
-    console.log('[CORE] mediaSelector change:', e.target.value);
-    buildScene(e.target.value);
-  });
+  sel.addEventListener('change', e => buildScene(e.target.value));
 
-  // carrega o primeiro mono por padrão
   sel.value = monoList[0];
   buildScene(monoList[0]);
 }
