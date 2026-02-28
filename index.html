@@ -53,7 +53,7 @@
       <h1>Tour VR — 360° Estéreo (Top/Bottom)</h1>
 
       <div class="row">
-        <button id="loadBtn">Carregar Tour</button>
+        <button id="loadBtn">Carregar O Tour</button>
         <button id="swapBtn" class="ghost" title="Swap Left/Right (olhos)">Inverter Olhos</button>
       </div>
 
@@ -95,10 +95,11 @@
         distance: 1.25,
         yOffset: -0.20,
         xOffset: 0.00,
-        width: 0.72,
-        height: 0.13,
+        width: 1.10,     // <<< era 0.72 (mais largo pra caber ~30 chars)
+        height: 0.14,    // <<< era 0.13
         followPos: 0.18,
         followRot: 0.22,
+        maxChars: 30,    // <<< NOVO: limite desejado
       }
     };
 
@@ -139,7 +140,6 @@
       return `${origin}/`;
     }
 
-    // monta URL com encode POR SEGMENTO (blinda espaço, acento, # etc)
     function toSiteUrl(path, base) {
       const clean = String(path || '').replace(/^\/+/, '');
       const encoded = clean.split('/').map(encodeURIComponent).join('/');
@@ -211,8 +211,8 @@
       scene.add(labelRoot);
 
       labelCanvas = document.createElement('canvas');
-      labelCanvas.width = 1024;
-      labelCanvas.height = 192;
+      labelCanvas.width = 1536;   // <<< era 1024
+      labelCanvas.height = 256;   // <<< era 192
       labelCtx = labelCanvas.getContext('2d');
 
       labelTex = new THREE.CanvasTexture(labelCanvas);
@@ -236,18 +236,25 @@
       labelRoot.visible = false;
     }
 
+    function ellipsizeHard(text, maxChars) {
+      const t = String(text ?? '');
+      if (t.length <= maxChars) return t;
+      // 29 + "…" = 30 chars
+      return t.slice(0, Math.max(1, maxChars - 1)) + '…';
+    }
+
     function drawLabelText(text) {
       if (!labelCtx) return;
       const w = labelCanvas.width, h = labelCanvas.height;
       labelCtx.clearRect(0, 0, w, h);
 
-      const r = 28;
-      const pad = 22;
+      const r = 34;
+      const pad = 28;
       const x = pad, y = pad, ww = w - pad * 2, hh = h - pad * 2;
 
       labelCtx.fillStyle = 'rgba(0,0,0,0.55)';
       labelCtx.strokeStyle = 'rgba(255,255,255,0.15)';
-      labelCtx.lineWidth = 4;
+      labelCtx.lineWidth = 5;
 
       labelCtx.beginPath();
       labelCtx.moveTo(x + r, y);
@@ -264,15 +271,19 @@
       labelCtx.stroke();
 
       labelCtx.fillStyle = 'rgba(255,255,255,0.92)';
-      labelCtx.font = '600 54px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      labelCtx.font = '600 44px system-ui, -apple-system, Segoe UI, Roboto, sans-serif'; // <<< era 54px
       labelCtx.textBaseline = 'middle';
 
-      const maxWidth = ww - 75;
-      let t = text;
-      while (labelCtx.measureText(t).width > maxWidth && t.length > 5) t = t.slice(0, -2);
-      if (t !== text) t = t + '…';
+      // 1) corta por chars primeiro (objetivo: ~30)
+      let t = ellipsizeHard(text, CONFIG.label.maxChars || 30);
 
-      labelCtx.fillText(t, x + 26, y + hh / 2);
+      // 2) ainda garante que cabe por largura (caso de string com letras largas)
+      const maxWidth = ww - 56;
+      while (labelCtx.measureText(t).width > maxWidth && t.length > 5) {
+        t = t.slice(0, -2) + '…';
+      }
+
+      labelCtx.fillText(t, x + 30, y + hh / 2);
       labelTex.needsUpdate = true;
     }
 
@@ -283,6 +294,8 @@
       if (!images.length) { drawLabelText('—'); return; }
       const item = images[currentIndex];
       const name = item?.name ?? '(sem nome)';
+
+      // dica: se quiser só o nome, troca essa linha por: drawLabelText(name);
       drawLabelText(`${currentIndex + 1}/${images.length} — ${name}`);
     }
 
@@ -519,7 +532,6 @@
         currentBaseTexture = null;
       }
 
-      // tenta Pages primeiro (mesma origem), se falhar cai pro RAW (download_url)
       const urlsToTry = [item.url, item.fallbackUrl].filter(Boolean);
 
       let loaded = null;
@@ -552,17 +564,6 @@
       currentBaseTexture = tex;
       rebuildSpheresWithBaseTexture(tex);
 
-      const warn = loaded.resized
-        ? `\n⚠️ Downscale: ${loaded.srcW}x${loaded.srcH} -> ${loaded.outW}x${loaded.outH} (limite GPU ${maxTexSize})`
-        : '';
-
-      setStatus(
-        `OK: ${item.name} (${idx + 1}/${images.length})\n` +
-        `URL: ${usedUrl}\n` +
-        `Res: ${loaded.outW}x${loaded.outH} | maxTextureSize: ${mts}\n` +
-        `XR scale: ${CONFIG.xrFramebufferScaleFactor} | foveation: ${CONFIG.xrFoveation}${warn}`
-      );
-
       updateLabelTextFromScene();
     }
 
@@ -590,11 +591,8 @@
         const gp = src.gamepad;
         if (!gp) continue;
 
-        // A=4, B=5
         if (isJustPressed('right', gp, 4)) nextImage();
         if (isJustPressed('right', gp, 5)) prevImage();
-
-        // Trigger (index finger) normalmente é o botão 0
         if (isJustPressed('right', gp, 0)) toggleLabel();
       }
     }
@@ -611,7 +609,6 @@
       renderer.setAnimationLoop(() => {
         pollControllerButtons();
 
-        // anti-“fisheye”: esfera segue a cabeça (remove transladação)
         if (renderer.xr.isPresenting) {
           const xrCam = renderer.xr.getCamera(camera);
           panoRoot.position.copy(xrCam.position);
@@ -646,7 +643,6 @@
       appEl.style.display = 'none';
     }
 
-    // ========= UI Actions =========
     swapBtn.addEventListener('click', () => {
       CONFIG.swapEyes = !CONFIG.swapEyes;
       setStatus(CONFIG.swapEyes ? 'Olhos invertidos (swap L/R): ON' : 'Olhos invertidos (swap L/R): OFF');
@@ -674,8 +670,8 @@
 
         images = list.map(it => ({
           name: it.name,
-          url: toSiteUrl(it.path, siteBase),       // GitHub Pages
-          fallbackUrl: it.download_url || null     // RAW
+          url: toSiteUrl(it.path, siteBase),
+          fallbackUrl: it.download_url || null
         }));
 
         currentIndex = 0;
@@ -696,4 +692,3 @@
   </script>
 </body>
 </html>
-
