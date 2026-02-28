@@ -267,7 +267,7 @@
       labelCtx.font = '600 54px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
       labelCtx.textBaseline = 'middle';
 
-      const maxWidth = ww - 44;
+      const maxWidth = ww - 75;
       let t = text;
       while (labelCtx.measureText(t).width > maxWidth && t.length > 5) t = t.slice(0, -2);
       if (t !== text) t = t + '…';
@@ -696,3 +696,4 @@
   </script>
 </body>
 </html>
+
