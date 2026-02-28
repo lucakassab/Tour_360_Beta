@@ -32,11 +32,9 @@
     .muted { color: rgba(255,255,255,0.72); font-size: 13px; line-height: 1.35; margin-top: 10px; }
     #status { margin-top: 10px; font-size: 14px; color: rgba(255,255,255,0.85); white-space: pre-line; }
     #canvasWrap { position: fixed; inset: 0; display: none; }
-
-    #hint, #sceneLabel {
-      position: fixed;
-      padding: 10px 12px;
-      border-radius: 12px;
+    #hint {
+      position: fixed; left: 12px; bottom: 12px;
+      padding: 10px 12px; border-radius: 12px;
       background: rgba(0,0,0,0.55);
       border: 1px solid rgba(255,255,255,0.12);
       color: rgba(255,255,255,0.9);
@@ -47,8 +45,6 @@
       -webkit-backdrop-filter: blur(4px);
       user-select: none;
     }
-    #hint { left: 12px; bottom: 12px; }
-    #sceneLabel { right: 12px; bottom: 12px; max-width: min(70vw, 520px); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   </style>
 </head>
 <body>
@@ -57,7 +53,7 @@
       <h1>Tour VR — 360° Estéreo (Top/Bottom)</h1>
 
       <div class="row">
-        <button id="loadBtn">Carregar Tourbta</button>
+        <button id="loadBtn">Carregar Tour</button>
         <button id="swapBtn" class="ghost" title="Swap Left/Right (olhos)">Inverter Olhos</button>
       </div>
 
@@ -72,7 +68,6 @@
 
   <div id="canvasWrap"></div>
   <div id="hint">A: próxima • B: anterior</div>
-  <div id="sceneLabel"></div>
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js';
@@ -93,6 +88,18 @@
       useMipmaps: false,
       magFilter: 'Linear',
       minFilter: 'Linear',
+
+      // ===== Legenda head-locked =====
+      label: {
+        enabled: true,
+        distance: 1.25,      // metros na frente do olhar
+        yOffset: -0.20,      // metros pra baixo (não tapa o centro)
+        xOffset: 0.00,       // lateral (0 = centro)
+        width: 0.72,         // largura do plane (m)
+        height: 0.13,        // altura do plane (m)
+        followPos: 0.18,     // suavização posição (0..1) maior = mais “grudado”
+        followRot: 0.22,     // suavização rotação (0..1)
+      }
     };
 
     const appEl = document.getElementById('app');
@@ -101,23 +108,12 @@
     const statusEl = document.getElementById('status');
     const canvasWrap = document.getElementById('canvasWrap');
     const hintEl = document.getElementById('hint');
-    const sceneLabelEl = document.getElementById('sceneLabel');
 
     function setStatus(msg) { statusEl.textContent = msg; }
     function panic(msg, err) {
       console.error(msg, err);
       setStatus(`${msg}${err ? '\n(Abre o console pra ver o erro)' : ''}`);
       loadBtn.disabled = false;
-    }
-
-    function setSceneLabel() {
-      if (!images.length) {
-        sceneLabelEl.textContent = '';
-        return;
-      }
-      const item = images[currentIndex];
-      const name = item?.name ?? '(sem nome)';
-      sceneLabelEl.textContent = `${currentIndex + 1}/${images.length} — ${name}`;
     }
 
     function inferGitHubRepo() {
@@ -187,6 +183,143 @@
     let images = [];
     let currentIndex = 0;
 
+    // ===== Legenda 3D (head-locked) =====
+    let labelRoot, labelMesh, labelCanvas, labelCtx, labelTex;
+    const _tmpPos = new THREE.Vector3();
+    const _tmpQuat = new THREE.Quaternion();
+    const _forward = new THREE.Vector3();
+    const _right = new THREE.Vector3();
+    const _up = new THREE.Vector3();
+
+    function initLabel3D() {
+      if (!CONFIG.label.enabled || labelRoot) return;
+
+      labelRoot = new THREE.Group();
+      scene.add(labelRoot);
+
+      // Canvas pra desenhar texto
+      labelCanvas = document.createElement('canvas');
+      labelCanvas.width = 1024;
+      labelCanvas.height = 192;
+      labelCtx = labelCanvas.getContext('2d');
+
+      labelTex = new THREE.CanvasTexture(labelCanvas);
+      labelTex.colorSpace = THREE.SRGBColorSpace;
+      labelTex.needsUpdate = true;
+
+      const mat = new THREE.MeshBasicMaterial({
+        map: labelTex,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        toneMapped: false,
+      });
+
+      const geo = new THREE.PlaneGeometry(CONFIG.label.width, CONFIG.label.height);
+      labelMesh = new THREE.Mesh(geo, mat);
+      labelMesh.renderOrder = 9999;
+      labelRoot.add(labelMesh);
+
+      // desenha inicial
+      drawLabelText('—');
+      labelRoot.visible = false;
+    }
+
+    function drawLabelText(text) {
+      if (!labelCtx) return;
+      const w = labelCanvas.width, h = labelCanvas.height;
+
+      labelCtx.clearRect(0, 0, w, h);
+
+      // fundo arredondado
+      const r = 28;
+      const pad = 22;
+      const x = pad, y = pad, ww = w - pad * 2, hh = h - pad * 2;
+
+      labelCtx.fillStyle = 'rgba(0,0,0,0.55)';
+      labelCtx.strokeStyle = 'rgba(255,255,255,0.15)';
+      labelCtx.lineWidth = 4;
+
+      labelCtx.beginPath();
+      labelCtx.moveTo(x + r, y);
+      labelCtx.lineTo(x + ww - r, y);
+      labelCtx.quadraticCurveTo(x + ww, y, x + ww, y + r);
+      labelCtx.lineTo(x + ww, y + hh - r);
+      labelCtx.quadraticCurveTo(x + ww, y + hh, x + ww - r, y + hh);
+      labelCtx.lineTo(x + r, y + hh);
+      labelCtx.quadraticCurveTo(x, y + hh, x, y + hh - r);
+      labelCtx.lineTo(x, y + r);
+      labelCtx.quadraticCurveTo(x, y, x + r, y);
+      labelCtx.closePath();
+      labelCtx.fill();
+      labelCtx.stroke();
+
+      // texto
+      labelCtx.fillStyle = 'rgba(255,255,255,0.92)';
+      labelCtx.font = '600 54px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      labelCtx.textBaseline = 'middle';
+
+      // elipse manual simples
+      const maxWidth = ww - 44;
+      let t = text;
+      while (labelCtx.measureText(t).width > maxWidth && t.length > 5) {
+        t = t.slice(0, -2);
+      }
+      if (t !== text) t = t + '…';
+
+      labelCtx.fillText(t, x + 26, y + hh / 2);
+
+      labelTex.needsUpdate = true;
+    }
+
+    function updateLabelTextFromScene() {
+      if (!CONFIG.label.enabled) return;
+      if (!labelRoot) initLabel3D();
+
+      if (!images.length) {
+        drawLabelText('—');
+        return;
+      }
+      const item = images[currentIndex];
+      const name = item?.name ?? '(sem nome)';
+      drawLabelText(`${currentIndex + 1}/${images.length} — ${name}`);
+    }
+
+    function setLabelVisible(v) {
+      if (!labelRoot) return;
+      labelRoot.visible = v;
+    }
+
+    function updateHeadLockedLabel() {
+      if (!CONFIG.label.enabled || !labelRoot || !renderer.xr.isPresenting) return;
+
+      const xrCam = renderer.xr.getCamera(camera); // ArrayCamera
+      xrCam.getWorldPosition(_tmpPos);
+      xrCam.getWorldQuaternion(_tmpQuat);
+
+      // base de vetores no espaço do mundo
+      _forward.set(0, 0, -1).applyQuaternion(_tmpQuat).normalize();
+      _right.set(1, 0, 0).applyQuaternion(_tmpQuat).normalize();
+      _up.set(0, 1, 0).applyQuaternion(_tmpQuat).normalize();
+
+      // posição alvo: na frente + levemente abaixo + opcional lateral
+      const targetPos = _tmpPos.clone()
+        .addScaledVector(_forward, CONFIG.label.distance)
+        .addScaledVector(_up, CONFIG.label.yOffset)
+        .addScaledVector(_right, CONFIG.label.xOffset);
+
+      // rotação alvo: olhando pro headset (billboard orientado com a cabeça)
+      const targetQuat = _tmpQuat.clone();
+
+      // suaviza
+      labelRoot.position.lerp(targetPos, CONFIG.label.followPos);
+      labelRoot.quaternion.slerp(targetQuat, CONFIG.label.followRot);
+
+      // garante que não some por clipping
+      labelMesh.material.depthTest = false;
+      labelMesh.material.depthWrite = false;
+    }
+
     const prevPressed = new Map();
     function isJustPressed(handedness, gamepad, btnIndex) {
       const btn = gamepad?.buttons?.[btnIndex];
@@ -229,6 +362,9 @@
       scene.add(panoRoot);
 
       sphereGeo = new THREE.SphereGeometry(10, 96, 72);
+
+      // cria label 3D desde já
+      initLabel3D();
 
       window.addEventListener('resize', () => {
         if (!renderer || !camera) return;
@@ -338,6 +474,7 @@
       if (rightSphere) panoRoot.remove(rightSphere);
       disposeEyeTextures();
 
+      // vertical corrigido via UV
       const yRepeat = -0.5;
       const topOffset = 1.0;
       const bottomOffset = 0.5;
@@ -402,20 +539,20 @@
 
       setStatus(`OK: ${item.name} (${idx + 1}/${images.length})\nRes: ${loaded.outW}x${loaded.outH} | maxTextureSize: ${mts}\nXR scale: ${CONFIG.xrFramebufferScaleFactor} | foveation: ${CONFIG.xrFoveation}${warn}`);
 
-      setSceneLabel();
+      updateLabelTextFromScene();
     }
 
     function nextImage() {
       if (!images.length) return;
       currentIndex = (currentIndex + 1) % images.length;
-      setSceneLabel();
+      updateLabelTextFromScene();
       loadTextureForIndex(currentIndex).catch(err => panic('Falha carregando textura', err));
     }
 
     function prevImage() {
       if (!images.length) return;
       currentIndex = (currentIndex - 1 + images.length) % images.length;
-      setSceneLabel();
+      updateLabelTextFromScene();
       loadTextureForIndex(currentIndex).catch(err => panic('Falha carregando textura', err));
     }
 
@@ -429,6 +566,7 @@
         const gp = src.gamepad;
         if (!gp) continue;
 
+        // Oculus Touch: A=4, B=5
         if (isJustPressed('right', gp, 4)) nextImage();
         if (isJustPressed('right', gp, 5)) prevImage();
       }
@@ -446,12 +584,16 @@
       renderer.setAnimationLoop(() => {
         pollControllerButtons();
 
+        // anti-“fisheye”: trava translação (esfera segue cabeça)
         if (renderer.xr.isPresenting) {
           const xrCam = renderer.xr.getCamera(camera);
           panoRoot.position.copy(xrCam.position);
         } else {
           panoRoot.position.set(0, 0, 0);
         }
+
+        // legenda head-locked com suavização
+        updateHeadLockedLabel();
 
         renderer.render(scene, camera);
       });
@@ -466,7 +608,7 @@
 
       session.addEventListener('end', () => {
         hintEl.style.display = 'none';
-        sceneLabelEl.style.display = 'none';
+        setLabelVisible(false);
         appEl.style.display = 'grid';
         setStatus('Sessão VR finalizada.');
       });
@@ -475,15 +617,16 @@
       forceXREyeLayers();
 
       hintEl.style.display = 'block';
-      sceneLabelEl.style.display = 'block';
+      setLabelVisible(true);
       appEl.style.display = 'none';
     }
 
+    // ========= UI Actions =========
     swapBtn.addEventListener('click', () => {
       CONFIG.swapEyes = !CONFIG.swapEyes;
       setStatus(CONFIG.swapEyes ? 'Olhos invertidos (swap L/R): ON' : 'Olhos invertidos (swap L/R): OFF');
       if (currentBaseTexture) rebuildSpheresWithBaseTexture(currentBaseTexture);
-      setSceneLabel();
+      updateLabelTextFromScene();
       try { forceXREyeLayers(); } catch {}
     });
 
@@ -507,7 +650,7 @@
         images = list.map(it => ({ name: it.name, url: new URL(it.path, siteBase).toString() }));
 
         currentIndex = 0;
-        setSceneLabel();
+        updateLabelTextFromScene();
 
         setStatus(`Achei ${images.length} imagem(ns). Carregando a primeira...`);
         await loadTextureForIndex(0);
