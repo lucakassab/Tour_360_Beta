@@ -53,7 +53,7 @@
       <h1>Tour VR — 360° Estéreo (Top/Bottom)</h1>
 
       <div class="row">
-        <button id="loadBtn">Carregar O Tour</button>
+        <button id="loadBtn">Carregar Tour</button>
         <button id="swapBtn" class="ghost" title="Swap Left/Right (olhos)">Inverter Olhos</button>
       </div>
 
@@ -95,11 +95,20 @@
         distance: 1.25,
         yOffset: -0.20,
         xOffset: 0.00,
-        width: 1.10,     // <<< era 0.72 (mais largo pra caber ~30 chars)
-        height: 0.14,    // <<< era 0.13
+
+        width: 1.25,
+        height: 0.16,
+
         followPos: 0.18,
         followRot: 0.22,
-        maxChars: 30,    // <<< NOVO: limite desejado
+
+        maxChars: 30,
+        fontPx: 44,
+        minFontPx: 28,
+        padX: 44,
+        padY: 18,
+        outerPad: 24,
+        radius: 32
       }
     };
 
@@ -211,8 +220,8 @@
       scene.add(labelRoot);
 
       labelCanvas = document.createElement('canvas');
-      labelCanvas.width = 1536;   // <<< era 1024
-      labelCanvas.height = 256;   // <<< era 192
+      labelCanvas.width = 2048;
+      labelCanvas.height = 256;
       labelCtx = labelCanvas.getContext('2d');
 
       labelTex = new THREE.CanvasTexture(labelCanvas);
@@ -239,51 +248,82 @@
     function ellipsizeHard(text, maxChars) {
       const t = String(text ?? '');
       if (t.length <= maxChars) return t;
-      // 29 + "…" = 30 chars
       return t.slice(0, Math.max(1, maxChars - 1)) + '…';
+    }
+
+    function roundRectPath(ctx, x, y, w, h, r) {
+      const rr = Math.max(0, Math.min(r, w / 2, h / 2));
+      ctx.beginPath();
+      ctx.moveTo(x + rr, y);
+      ctx.lineTo(x + w - rr, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + rr);
+      ctx.lineTo(x + w, y + h - rr);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - rr, y + h);
+      ctx.lineTo(x + rr, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - rr);
+      ctx.lineTo(x, y + rr);
+      ctx.quadraticCurveTo(x, y, x + rr, y);
+      ctx.closePath();
     }
 
     function drawLabelText(text) {
       if (!labelCtx) return;
-      const w = labelCanvas.width, h = labelCanvas.height;
-      labelCtx.clearRect(0, 0, w, h);
 
-      const r = 34;
-      const pad = 28;
-      const x = pad, y = pad, ww = w - pad * 2, hh = h - pad * 2;
+      const W = labelCanvas.width, H = labelCanvas.height;
+      labelCtx.clearRect(0, 0, W, H);
 
+      const maxChars = CONFIG.label.maxChars ?? 30;
+      const outerPad = CONFIG.label.outerPad ?? 24;
+      const padX = CONFIG.label.padX ?? 44;
+      const padY = CONFIG.label.padY ?? 18;
+      const radius = CONFIG.label.radius ?? 32;
+
+      // 1) limita por caracteres primeiro
+      let t = ellipsizeHard(text, maxChars);
+
+      // 2) tenta caber reduzindo fonte
+      let fontSize = CONFIG.label.fontPx ?? 44;
+      const minFont = CONFIG.label.minFontPx ?? 28;
+
+      const maxRectW = W - outerPad * 2;
+
+      labelCtx.textBaseline = 'middle';
+      labelCtx.textAlign = 'left';
+
+      while (true) {
+        labelCtx.font = `650 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+        const tw = labelCtx.measureText(t).width;
+
+        if ((tw + padX * 2) <= maxRectW || fontSize <= minFont) break;
+        fontSize -= 2;
+      }
+
+      // 3) se nem com fonte mínima couber, corta por largura
+      labelCtx.font = `650 ${fontSize}px system-ui, -apple-system, Segoe UI, Roboto, sans-serif`;
+      let tt = t;
+      while (tt.length > 2 && (labelCtx.measureText(tt).width + padX * 2) > maxRectW) {
+        tt = tt.slice(0, -2) + '…';
+      }
+
+      const textW = labelCtx.measureText(tt).width;
+      const rectW = Math.min(maxRectW, textW + padX * 2);
+      const rectH = Math.min(H - outerPad * 2, fontSize + padY * 2);
+
+      const x = (W - rectW) * 0.5;
+      const y = (H - rectH) * 0.5;
+
+      // fundo ajustado ao texto
       labelCtx.fillStyle = 'rgba(0,0,0,0.55)';
       labelCtx.strokeStyle = 'rgba(255,255,255,0.15)';
       labelCtx.lineWidth = 5;
 
-      labelCtx.beginPath();
-      labelCtx.moveTo(x + r, y);
-      labelCtx.lineTo(x + ww - r, y);
-      labelCtx.quadraticCurveTo(x + ww, y, x + ww, y + r);
-      labelCtx.lineTo(x + ww, y + hh - r);
-      labelCtx.quadraticCurveTo(x + ww, y + hh, x + ww - r, y + hh);
-      labelCtx.lineTo(x + r, y + hh);
-      labelCtx.quadraticCurveTo(x, y + hh, x, y + hh - r);
-      labelCtx.lineTo(x, y + r);
-      labelCtx.quadraticCurveTo(x, y, x + r, y);
-      labelCtx.closePath();
+      roundRectPath(labelCtx, x, y, rectW, rectH, radius);
       labelCtx.fill();
       labelCtx.stroke();
 
       labelCtx.fillStyle = 'rgba(255,255,255,0.92)';
-      labelCtx.font = '600 44px system-ui, -apple-system, Segoe UI, Roboto, sans-serif'; // <<< era 54px
-      labelCtx.textBaseline = 'middle';
+      labelCtx.fillText(tt, x + padX, y + rectH * 0.5);
 
-      // 1) corta por chars primeiro (objetivo: ~30)
-      let t = ellipsizeHard(text, CONFIG.label.maxChars || 30);
-
-      // 2) ainda garante que cabe por largura (caso de string com letras largas)
-      const maxWidth = ww - 56;
-      while (labelCtx.measureText(t).width > maxWidth && t.length > 5) {
-        t = t.slice(0, -2) + '…';
-      }
-
-      labelCtx.fillText(t, x + 30, y + hh / 2);
       labelTex.needsUpdate = true;
     }
 
@@ -292,11 +332,16 @@
       if (!labelRoot) initLabel3D();
 
       if (!images.length) { drawLabelText('—'); return; }
+
       const item = images[currentIndex];
       const name = item?.name ?? '(sem nome)';
 
-      // dica: se quiser só o nome, troca essa linha por: drawLabelText(name);
-      drawLabelText(`${currentIndex + 1}/${images.length} — ${name}`);
+      const prefix = `${currentIndex + 1}/${images.length} `;
+      const maxChars = CONFIG.label.maxChars ?? 30;
+      const nameBudget = Math.max(6, maxChars - prefix.length);
+      const shortName = ellipsizeHard(name, nameBudget);
+
+      drawLabelText(prefix + shortName);
     }
 
     function setLabelVisible(v) {
