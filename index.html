@@ -53,7 +53,7 @@
       <h1>Tour VR — 360° Estéreo (Top/Bottom)</h1>
 
       <div class="row">
-        <button id="loadBtn">Carregar Tour</button>
+        <button id="loadBtn">Carregar Tour B</button>
         <button id="swapBtn" class="ghost" title="Swap Left/Right (olhos)">Inverter Olhos</button>
       </div>
 
@@ -61,13 +61,14 @@
 
       <div class="muted">
         Controles no VR: <b>A</b> = próxima, <b>B</b> = anterior.<br/>
+        Trigger: mostrar/ocultar legenda.<br/>
         Se o estéreo ficar invertido, usa <b>Inverter Olhos</b>.
       </div>
     </div>
   </div>
 
   <div id="canvasWrap"></div>
-  <div id="hint">A: próxima • B: anterior</div>
+  <div id="hint">A: próxima • B: anterior • Trigger: legenda</div>
 
   <script type="module">
     import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.183.1/build/three.module.js';
@@ -89,16 +90,15 @@
       magFilter: 'Linear',
       minFilter: 'Linear',
 
-      // ===== Legenda head-locked =====
       label: {
         enabled: true,
-        distance: 1.25,      // metros na frente do olhar
-        yOffset: -0.20,      // metros pra baixo (não tapa o centro)
-        xOffset: 0.00,       // lateral (0 = centro)
-        width: 0.72,         // largura do plane (m)
-        height: 0.13,        // altura do plane (m)
-        followPos: 0.18,     // suavização posição (0..1) maior = mais “grudado”
-        followRot: 0.22,     // suavização rotação (0..1)
+        distance: 1.25,
+        yOffset: -0.20,
+        xOffset: 0.00,
+        width: 0.72,
+        height: 0.13,
+        followPos: 0.18,
+        followRot: 0.22,
       }
     };
 
@@ -183,8 +183,10 @@
     let images = [];
     let currentIndex = 0;
 
-    // ===== Legenda 3D (head-locked) =====
+    // ===== Label 3D =====
     let labelRoot, labelMesh, labelCanvas, labelCtx, labelTex;
+    let labelEnabledRuntime = true;
+
     const _tmpPos = new THREE.Vector3();
     const _tmpQuat = new THREE.Quaternion();
     const _forward = new THREE.Vector3();
@@ -197,7 +199,6 @@
       labelRoot = new THREE.Group();
       scene.add(labelRoot);
 
-      // Canvas pra desenhar texto
       labelCanvas = document.createElement('canvas');
       labelCanvas.width = 1024;
       labelCanvas.height = 192;
@@ -220,7 +221,6 @@
       labelMesh.renderOrder = 9999;
       labelRoot.add(labelMesh);
 
-      // desenha inicial
       drawLabelText('—');
       labelRoot.visible = false;
     }
@@ -228,10 +228,8 @@
     function drawLabelText(text) {
       if (!labelCtx) return;
       const w = labelCanvas.width, h = labelCanvas.height;
-
       labelCtx.clearRect(0, 0, w, h);
 
-      // fundo arredondado
       const r = 28;
       const pad = 22;
       const x = pad, y = pad, ww = w - pad * 2, hh = h - pad * 2;
@@ -254,21 +252,16 @@
       labelCtx.fill();
       labelCtx.stroke();
 
-      // texto
       labelCtx.fillStyle = 'rgba(255,255,255,0.92)';
       labelCtx.font = '600 54px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
       labelCtx.textBaseline = 'middle';
 
-      // elipse manual simples
       const maxWidth = ww - 44;
       let t = text;
-      while (labelCtx.measureText(t).width > maxWidth && t.length > 5) {
-        t = t.slice(0, -2);
-      }
+      while (labelCtx.measureText(t).width > maxWidth && t.length > 5) t = t.slice(0, -2);
       if (t !== text) t = t + '…';
 
       labelCtx.fillText(t, x + 26, y + hh / 2);
-
       labelTex.needsUpdate = true;
     }
 
@@ -276,10 +269,7 @@
       if (!CONFIG.label.enabled) return;
       if (!labelRoot) initLabel3D();
 
-      if (!images.length) {
-        drawLabelText('—');
-        return;
-      }
+      if (!images.length) { drawLabelText('—'); return; }
       const item = images[currentIndex];
       const name = item?.name ?? '(sem nome)';
       drawLabelText(`${currentIndex + 1}/${images.length} — ${name}`);
@@ -290,36 +280,36 @@
       labelRoot.visible = v;
     }
 
+    function toggleLabel() {
+      labelEnabledRuntime = !labelEnabledRuntime;
+      setLabelVisible(renderer?.xr?.isPresenting ? labelEnabledRuntime : false);
+    }
+
     function updateHeadLockedLabel() {
       if (!CONFIG.label.enabled || !labelRoot || !renderer.xr.isPresenting) return;
+      if (!labelEnabledRuntime) { labelRoot.visible = false; return; }
 
-      const xrCam = renderer.xr.getCamera(camera); // ArrayCamera
+      const xrCam = renderer.xr.getCamera(camera);
       xrCam.getWorldPosition(_tmpPos);
       xrCam.getWorldQuaternion(_tmpQuat);
 
-      // base de vetores no espaço do mundo
       _forward.set(0, 0, -1).applyQuaternion(_tmpQuat).normalize();
       _right.set(1, 0, 0).applyQuaternion(_tmpQuat).normalize();
       _up.set(0, 1, 0).applyQuaternion(_tmpQuat).normalize();
 
-      // posição alvo: na frente + levemente abaixo + opcional lateral
       const targetPos = _tmpPos.clone()
         .addScaledVector(_forward, CONFIG.label.distance)
         .addScaledVector(_up, CONFIG.label.yOffset)
         .addScaledVector(_right, CONFIG.label.xOffset);
 
-      // rotação alvo: olhando pro headset (billboard orientado com a cabeça)
       const targetQuat = _tmpQuat.clone();
 
-      // suaviza
       labelRoot.position.lerp(targetPos, CONFIG.label.followPos);
       labelRoot.quaternion.slerp(targetQuat, CONFIG.label.followRot);
-
-      // garante que não some por clipping
-      labelMesh.material.depthTest = false;
-      labelMesh.material.depthWrite = false;
+      labelRoot.visible = true;
     }
 
+    // ========= Input =========
     const prevPressed = new Map();
     function isJustPressed(handedness, gamepad, btnIndex) {
       const btn = gamepad?.buttons?.[btnIndex];
@@ -363,7 +353,6 @@
 
       sphereGeo = new THREE.SphereGeometry(10, 96, 72);
 
-      // cria label 3D desde já
       initLabel3D();
 
       window.addEventListener('resize', () => {
@@ -474,7 +463,6 @@
       if (rightSphere) panoRoot.remove(rightSphere);
       disposeEyeTextures();
 
-      // vertical corrigido via UV
       const yRepeat = -0.5;
       const topOffset = 1.0;
       const bottomOffset = 0.5;
@@ -562,13 +550,16 @@
 
       for (const src of session.inputSources) {
         if (src?.targetRayMode !== 'tracked-pointer') continue;
-        if (src?.handedness !== 'right') continue;
+        if (src?.handedness !== 'right') continue; // usa o right controller
         const gp = src.gamepad;
         if (!gp) continue;
 
-        // Oculus Touch: A=4, B=5
+        // A=4, B=5
         if (isJustPressed('right', gp, 4)) nextImage();
         if (isJustPressed('right', gp, 5)) prevImage();
+
+        // Trigger (index finger) normalmente é o botão 0
+        if (isJustPressed('right', gp, 0)) toggleLabel();
       }
     }
 
@@ -584,7 +575,7 @@
       renderer.setAnimationLoop(() => {
         pollControllerButtons();
 
-        // anti-“fisheye”: trava translação (esfera segue cabeça)
+        // anti-“fisheye”: esfera segue a cabeça (remove transladação)
         if (renderer.xr.isPresenting) {
           const xrCam = renderer.xr.getCamera(camera);
           panoRoot.position.copy(xrCam.position);
@@ -592,7 +583,6 @@
           panoRoot.position.set(0, 0, 0);
         }
 
-        // legenda head-locked com suavização
         updateHeadLockedLabel();
 
         renderer.render(scene, camera);
@@ -617,7 +607,7 @@
       forceXREyeLayers();
 
       hintEl.style.display = 'block';
-      setLabelVisible(true);
+      setLabelVisible(labelEnabledRuntime);
       appEl.style.display = 'none';
     }
 
