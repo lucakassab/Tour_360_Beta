@@ -44,8 +44,7 @@ class Tour360App {
     this.currentTexture = null;
     this.manualYaw = 0;
     this.manualPitch = 0;
-    this.gyroYaw = 0;
-    this.gyroPitch = 0;
+    this.gyroQuaternion = null;
   }
 
   init() {
@@ -72,6 +71,8 @@ class Tour360App {
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1100);
     this.camera.position.set(0, 0, 0);
     this.camera.rotation.order = 'YXZ';
+    this.manualEuler = new THREE.Euler(0, 0, 0, 'YXZ');
+    this.manualQuaternion = new THREE.Quaternion();
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -126,7 +127,7 @@ class Tour360App {
       camera: this.camera,
       rotateBy: (deltaYaw, deltaPitch) => this.rotateBy(deltaYaw, deltaPitch),
       setFov: (nextFov) => this.setFov(nextFov),
-      setGyroRotation: (yaw, pitch) => this.setGyroRotation(yaw, pitch),
+      setGyroQuaternion: (quaternion) => this.setGyroQuaternion(quaternion),
       setStatus: (message) => this.setStatus(message),
       gyroButton: this.gyroButton
     };
@@ -187,9 +188,12 @@ class Tour360App {
     this.manualPitch = clamp(this.manualPitch + deltaPitch, -PITCH_LIMIT, PITCH_LIMIT);
   }
 
-  setGyroRotation(yaw, pitch) {
-    this.gyroYaw = yaw;
-    this.gyroPitch = clamp(pitch, -PITCH_LIMIT, PITCH_LIMIT);
+  setGyroQuaternion(quaternion) {
+    if (!this.gyroQuaternion) {
+      this.gyroQuaternion = new this.THREE.Quaternion();
+    }
+
+    this.gyroQuaternion.copy(quaternion);
   }
 
   setFov(nextFov) {
@@ -198,8 +202,16 @@ class Tour360App {
   }
 
   applyCameraRotation() {
-    this.camera.rotation.y = this.manualYaw + this.gyroYaw;
-    this.camera.rotation.x = clamp(this.manualPitch + this.gyroPitch, -PITCH_LIMIT, PITCH_LIMIT);
+    if (this.gyroQuaternion) {
+      this.manualEuler.set(this.manualPitch, this.manualYaw, 0);
+      this.manualQuaternion.setFromEuler(this.manualEuler);
+      this.camera.quaternion.copy(this.gyroQuaternion).multiply(this.manualQuaternion);
+      return;
+    }
+
+    this.camera.rotation.y = this.manualYaw;
+    this.camera.rotation.x = this.manualPitch;
+    this.camera.rotation.z = 0;
   }
 
   resize() {

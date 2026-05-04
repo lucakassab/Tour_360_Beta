@@ -1,26 +1,33 @@
 import {
-  clamp,
   degreesToRadians,
   supportsDeviceOrientation
 } from './shared/utils.js';
 
 const ROTATE_SPEED = 0.005;
-const PITCH_LIMIT = degreesToRadians(85);
+const SENSOR_SMOOTHING = 0.18;
 
 export function initMobileControls(options) {
   const {
     element,
-    camera,
     rotateBy,
-    setGyroRotation,
+    setGyroQuaternion,
     setStatus,
     gyroButton
   } = options;
+
+  const THREE = window.THREE;
+  const zee = THREE ? new THREE.Vector3(0, 0, 1) : null;
+  const euler = THREE ? new THREE.Euler() : null;
+  const q0 = THREE ? new THREE.Quaternion() : null;
+  const q1 = THREE ? new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)) : null;
+  const sensorQuaternion = THREE ? new THREE.Quaternion() : null;
+  const smoothedQuaternion = THREE ? new THREE.Quaternion() : null;
 
   let isTouching = false;
   let lastX = 0;
   let lastY = 0;
   let gyroActive = false;
+  let hasSensorSample = false;
 
   function handleTouchStart(event) {
     if (!event.touches.length) {
@@ -54,7 +61,7 @@ export function initMobileControls(options) {
   }
 
   async function handleGyroClick() {
-    if (!supportsDeviceOrientation()) {
+    if (!THREE || !supportsDeviceOrientation()) {
       setStatus('Giroscópio não disponível');
       return;
     }
@@ -78,6 +85,7 @@ export function initMobileControls(options) {
     if (!gyroActive) {
       window.addEventListener('deviceorientation', handleDeviceOrientation, true);
       gyroActive = true;
+      hasSensorSample = false;
     }
 
     setStatus('Giroscópio ativado');
@@ -93,18 +101,24 @@ export function initMobileControls(options) {
       return;
     }
 
-    const screenAngle = getScreenAngle();
-    const isLandscape = Math.abs(screenAngle) === 90;
-    const alpha = event.alpha || 0;
-    const beta = event.beta || 0;
-    const gamma = event.gamma || 0;
-    const pitchDegrees = isLandscape ? gamma : beta - 90;
+    const alpha = degreesToRadians(event.alpha || 0);
+    const beta = degreesToRadians(event.beta || 0);
+    const gamma = degreesToRadians(event.gamma || 0);
+    const screenOrientation = degreesToRadians(getScreenAngle());
 
-    const yaw = degreesToRadians(-alpha + screenAngle);
-    const pitch = clamp(degreesToRadians(pitchDegrees), -PITCH_LIMIT, PITCH_LIMIT);
+    euler.set(beta, alpha, -gamma, 'YXZ');
+    sensorQuaternion.setFromEuler(euler);
+    sensorQuaternion.multiply(q1);
+    sensorQuaternion.multiply(q0.setFromAxisAngle(zee, -screenOrientation));
 
-    setGyroRotation(yaw, pitch);
-    camera.updateProjectionMatrix();
+    if (!hasSensorSample) {
+      smoothedQuaternion.copy(sensorQuaternion);
+      hasSensorSample = true;
+    } else {
+      smoothedQuaternion.slerp(sensorQuaternion, SENSOR_SMOOTHING);
+    }
+
+    setGyroQuaternion(smoothedQuaternion);
   }
 
   function getScreenAngle() {

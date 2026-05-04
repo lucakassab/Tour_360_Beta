@@ -1,4 +1,4 @@
-const CACHE_NAME = 'tour-360-v3';
+const CACHE_NAME = 'tour-360-v4';
 
 const CORE_ASSETS = [
   './',
