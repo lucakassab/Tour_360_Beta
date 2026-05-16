@@ -1,1 +1,4 @@
-﻿.certs/
+.certs/
+.build_tmp/
+.restore_source_tmp/
+source_tour/
