@@ -147,6 +147,62 @@
       opacity: 0.78;
     }
 
+    .loading-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 8;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: #f7fbfb;
+      background: rgba(7, 10, 11, 0.28);
+      backdrop-filter: blur(4px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.24s ease;
+    }
+
+    .loading-overlay[data-visible="true"] {
+      opacity: 1;
+    }
+
+    .loading-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      min-height: 42px;
+      padding: 10px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 8px;
+      background: rgba(17, 17, 17, 0.58);
+      box-shadow: 0 14px 38px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(12px);
+      font-size: 14px;
+      line-height: 1;
+      letter-spacing: 0;
+      transform: translateY(6px);
+      transition: transform 0.24s ease;
+    }
+
+    .loading-overlay[data-visible="true"] .loading-indicator {
+      transform: translateY(0);
+    }
+
+    .loading-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid rgba(255, 255, 255, 0.24);
+      border-top-color: #63d9c2;
+      border-radius: 50%;
+      animation: loading-spin 0.82s linear infinite;
+    }
+
+    @keyframes loading-spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
     .gyro-status {
       position: fixed;
       z-index: 11;
@@ -197,6 +253,13 @@
   <div id="app">
     <main id="viewer" aria-label="Visualizador 360"></main>
 
+    <div id="loadingOverlay" class="loading-overlay" data-visible="false" aria-live="polite" aria-hidden="true">
+      <div class="loading-indicator">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span>Carregando...</span>
+      </div>
+    </div>
+
     <div class="controls" aria-label="Controles do tour">
       <label class="sr-only" for="panoramaSelect">Imagem</label>
       <select id="panoramaSelect" aria-label="Escolher imagem"></select>
@@ -207,6 +270,6 @@
   </div>
 
   <script src="./assets/vendor/three.min.js"></script>
-  <script src="./main/tour.app.js?v=20260516171046"></script>
+  <script src="./main/tour.app.js?v=20260516180339"></script>
 </body>
 </html>
