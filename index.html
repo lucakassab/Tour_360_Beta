@@ -142,6 +142,38 @@
       box-shadow: 0 0 0 3px rgba(99, 217, 194, 0.22);
     }
 
+    button:disabled {
+      cursor: wait;
+      opacity: 0.78;
+    }
+
+    .gyro-status {
+      position: fixed;
+      z-index: 11;
+      left: 50%;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      width: max-content;
+      max-width: min(520px, calc(100vw - 24px));
+      padding: 10px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px;
+      color: #f7fbfb;
+      background: rgba(17, 17, 17, 0.9);
+      box-shadow: 0 12px 34px rgba(0, 0, 0, 0.36);
+      font-size: 14px;
+      line-height: 1.35;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 10px);
+      transition: opacity 0.18s ease, transform 0.18s ease;
+    }
+
+    .gyro-status[data-visible="true"] {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
     @media (max-width: 720px) {
       .controls {
         align-items: stretch;
@@ -175,6 +207,6 @@
   </div>
 
   <script src="./assets/vendor/three.min.js"></script>
-  <script src="./main/tour.app.js?v=20260516164549"></script>
+  <script src="./main/tour.app.js?v=20260516171046"></script>
 </body>
 </html>
