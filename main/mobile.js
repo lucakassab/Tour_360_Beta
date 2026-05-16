@@ -1,16 +1,19 @@
 import {
+  clamp,
   degreesToRadians,
   supportsDeviceOrientation
-} from './shared/utils.js';
+} from './shared/utils.js?v=16';
 
 const ROTATE_SPEED = 0.005;
 const SENSOR_SMOOTHING = 0.18;
+const MAX_SENSOR_PITCH = Math.PI * 0.47;
 
 export function initMobileControls(options) {
   const {
     element,
     rotateBy,
-    setGyroQuaternion,
+    setGyroRotation,
+    setGyroResetHandler,
     setStatus,
     gyroButton
   } = options;
@@ -21,13 +24,17 @@ export function initMobileControls(options) {
   const q0 = THREE ? new THREE.Quaternion() : null;
   const q1 = THREE ? new THREE.Quaternion(-Math.sqrt(0.5), 0, 0, Math.sqrt(0.5)) : null;
   const sensorQuaternion = THREE ? new THREE.Quaternion() : null;
-  const smoothedQuaternion = THREE ? new THREE.Quaternion() : null;
+  const forwardDirection = THREE ? new THREE.Vector3() : null;
 
   let isTouching = false;
   let lastX = 0;
   let lastY = 0;
   let gyroActive = false;
   let hasSensorSample = false;
+  let referenceYaw = 0;
+  let referencePitch = 0;
+  let smoothedYaw = 0;
+  let smoothedPitch = 0;
 
   function handleTouchStart(event) {
     if (!event.touches.length) {
@@ -61,8 +68,13 @@ export function initMobileControls(options) {
   }
 
   async function handleGyroClick() {
+    if (gyroActive) {
+      deactivateGyro();
+      return;
+    }
+
     if (!THREE || !supportsDeviceOrientation()) {
-      setStatus('Giroscópio não disponível');
+      setStatus('Girosc\u00f3pio n\u00e3o dispon\u00edvel');
       return;
     }
 
@@ -73,22 +85,48 @@ export function initMobileControls(options) {
         const permission = await orientationEvent.requestPermission();
 
         if (permission !== 'granted') {
-          setStatus('Permissão do giroscópio negada');
+          setStatus('Permiss\u00e3o do girosc\u00f3pio negada');
           return;
         }
       } catch (error) {
-        setStatus('Permissão do giroscópio negada');
+        setStatus('Permiss\u00e3o do girosc\u00f3pio negada');
         return;
       }
     }
 
-    if (!gyroActive) {
-      window.addEventListener('deviceorientation', handleDeviceOrientation, true);
-      gyroActive = true;
-      hasSensorSample = false;
+    activateGyro();
+    resetGyroCalibration();
+    setStatus('Girosc\u00f3pio ativado');
+  }
+
+  function activateGyro() {
+    window.addEventListener('deviceorientation', handleDeviceOrientation, true);
+    gyroActive = true;
+    syncGyroButton();
+  }
+
+  function deactivateGyro() {
+    window.removeEventListener('deviceorientation', handleDeviceOrientation, true);
+    gyroActive = false;
+    resetGyroCalibration();
+    syncGyroButton();
+    setStatus('Girosc\u00f3pio desativado');
+  }
+
+  function resetGyroCalibration() {
+    hasSensorSample = false;
+    smoothedYaw = 0;
+    smoothedPitch = 0;
+    setGyroRotation(0, 0);
+  }
+
+  function syncGyroButton() {
+    if (!gyroButton) {
+      return;
     }
 
-    setStatus('Giroscópio ativado');
+    gyroButton.textContent = gyroActive ? 'Desativar girosc\u00f3pio' : 'Ativar girosc\u00f3pio';
+    gyroButton.setAttribute('aria-pressed', gyroActive ? 'true' : 'false');
   }
 
   function handleDeviceOrientation(event) {
@@ -97,10 +135,32 @@ export function initMobileControls(options) {
     }
 
     if (event.alpha === null && event.beta === null && event.gamma === null) {
-      setStatus('Giroscópio não disponível');
+      setStatus('Girosc\u00f3pio n\u00e3o dispon\u00edvel');
       return;
     }
 
+    const sensorRotation = getSensorYawPitch(event);
+
+    if (!hasSensorSample) {
+      referenceYaw = sensorRotation.yaw;
+      referencePitch = sensorRotation.pitch;
+      smoothedYaw = 0;
+      smoothedPitch = 0;
+      hasSensorSample = true;
+      setGyroRotation(0, 0);
+      return;
+    }
+
+    const targetYaw = normalizeAngle(sensorRotation.yaw - referenceYaw);
+    const targetPitch = clamp(sensorRotation.pitch - referencePitch, -MAX_SENSOR_PITCH, MAX_SENSOR_PITCH);
+
+    smoothedYaw += normalizeAngle(targetYaw - smoothedYaw) * SENSOR_SMOOTHING;
+    smoothedPitch += (targetPitch - smoothedPitch) * SENSOR_SMOOTHING;
+
+    setGyroRotation(smoothedYaw, smoothedPitch);
+  }
+
+  function getSensorYawPitch(event) {
     const alpha = degreesToRadians(event.alpha || 0);
     const beta = degreesToRadians(event.beta || 0);
     const gamma = degreesToRadians(event.gamma || 0);
@@ -111,14 +171,26 @@ export function initMobileControls(options) {
     sensorQuaternion.multiply(q1);
     sensorQuaternion.multiply(q0.setFromAxisAngle(zee, -screenOrientation));
 
-    if (!hasSensorSample) {
-      smoothedQuaternion.copy(sensorQuaternion);
-      hasSensorSample = true;
-    } else {
-      smoothedQuaternion.slerp(sensorQuaternion, SENSOR_SMOOTHING);
+    forwardDirection.set(0, 0, -1).applyQuaternion(sensorQuaternion);
+
+    return {
+      yaw: Math.atan2(-forwardDirection.x, -forwardDirection.z),
+      pitch: Math.asin(clamp(forwardDirection.y, -1, 1))
+    };
+  }
+
+  function normalizeAngle(angle) {
+    let normalized = angle;
+
+    while (normalized <= -Math.PI) {
+      normalized += Math.PI * 2;
     }
 
-    setGyroQuaternion(smoothedQuaternion);
+    while (normalized > Math.PI) {
+      normalized -= Math.PI * 2;
+    }
+
+    return normalized;
   }
 
   function getScreenAngle() {
@@ -133,9 +205,15 @@ export function initMobileControls(options) {
   element.addEventListener('touchmove', handleTouchMove, { passive: false });
   element.addEventListener('touchend', handleTouchEnd);
   element.addEventListener('touchcancel', handleTouchEnd);
+  window.addEventListener('orientationchange', resetGyroCalibration);
 
   if (gyroButton) {
     gyroButton.addEventListener('click', handleGyroClick);
+    syncGyroButton();
+  }
+
+  if (setGyroResetHandler) {
+    setGyroResetHandler(resetGyroCalibration);
   }
 
   setStatus('Arraste para olhar ao redor');

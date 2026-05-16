@@ -1,31 +1,63 @@
 import {
   clamp,
   isMobileDevice,
-  setText,
   wrapIndex
-} from './shared/utils.js';
-import { initDesktopControls } from './desktop.js';
-import { initMobileControls } from './mobile.js';
+} from './shared/utils.js?v=16';
+import { initDesktopControls } from './desktop.js?v=16';
+import { initMobileControls } from './mobile.js?v=16';
 
 const PANORAMAS = [
   {
-    title: 'Panorama 01',
-    src: './assets/panoramas/panorama_01.jpg'
+    id: 'fachada-portico-dia',
+    title: 'Pórtico',
+    src: './assets/panoramas/mono_images/Fachada_Portico_Dia.jpg',
+    yaw: -90
   },
   {
-    title: 'Panorama 02',
-    src: './assets/panoramas/panorama_02.jpg'
+    id: 'fachada-dia',
+    title: 'Fachada Diurna',
+    src: './assets/panoramas/mono_images/Fachada_Dia.jpg',
+    yaw: -90
   },
   {
-    title: 'Panorama 03',
-    src: './assets/panoramas/panorama_03.jpg'
+    id: 'fachada-noite',
+    title: 'Fachada Noturna',
+    src: './assets/panoramas/mono_images/Fachada_Noite.jpg',
+    yaw: -90
   },
   {
-    title: 'Panorama 04',
-    src: './assets/panoramas/panorama_04.jpg'
+    id: 'pet-place',
+    title: 'Pet Place',
+    src: './assets/panoramas/mono_images/PETPLACE8K.jpg',
+    yaw: -90
+  },
+  {
+    id: 'piscina',
+    title: 'Piscina',
+    src: './assets/panoramas/mono_images/PISCINA8K.jpg',
+    yaw: -90
+  },
+  {
+    id: 'salao-de-festas',
+    title: 'Salão de Festas',
+    src: './assets/panoramas/mono_images/FESTAS8K.jpg',
+    yaw: 180
+  },
+  {
+    id: 'academia',
+    title: 'Academia',
+    src: './assets/panoramas/mono_images/ACADEMIA8K.jpg',
+    yaw: 180
+  },
+  {
+    id: 'churrasqueira',
+    title: 'Pool House',
+    src: './assets/panoramas/mono_images/CHURRASQUEIRA8K.jpg',
+    yaw: -90
   }
 ];
 
+const SCENE_QUERY_PARAM = 'scene';
 const PITCH_LIMIT = Math.PI * 0.47;
 const MIN_FOV = 35;
 const MAX_FOV = 95;
@@ -38,13 +70,14 @@ class Tour360App {
     this.previousButton = document.getElementById('previousButton');
     this.nextButton = document.getElementById('nextButton');
     this.gyroButton = document.getElementById('gyroButton');
-    this.status = document.getElementById('status');
 
     this.currentIndex = 0;
     this.currentTexture = null;
     this.manualYaw = 0;
     this.manualPitch = 0;
-    this.gyroQuaternion = null;
+    this.gyroYaw = 0;
+    this.gyroPitch = 0;
+    this.resetGyroCalibration = null;
   }
 
   init() {
@@ -58,7 +91,7 @@ class Tour360App {
     this.populateSelect();
     this.bindUi();
     this.initControls();
-    this.loadPanorama(0);
+    this.loadPanorama(this.getInitialPanoramaIndex(), { updateUrl: false });
     this.resize();
     this.animate();
     this.registerServiceWorker();
@@ -71,26 +104,40 @@ class Tour360App {
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1100);
     this.camera.position.set(0, 0, 0);
     this.camera.rotation.order = 'YXZ';
-    this.manualEuler = new THREE.Euler(0, 0, 0, 'YXZ');
-    this.manualQuaternion = new THREE.Quaternion();
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: true,
       powerPreference: 'high-performance'
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this.configureColorManagement(THREE);
     this.viewer.appendChild(this.renderer.domElement);
 
     this.geometry = new THREE.SphereGeometry(500, 64, 40);
-    this.applyMonoStereoUvCrop(this.geometry);
+    this.flipPanoramaUvHorizontally(this.geometry);
     this.material = new THREE.MeshBasicMaterial({
       color: 0xffffff,
       side: THREE.BackSide
     });
+    this.material.toneMapped = false;
     this.sphere = new THREE.Mesh(this.geometry, this.material);
     this.scene.add(this.sphere);
 
     this.textureLoader = new THREE.TextureLoader();
+  }
+
+  configureColorManagement(THREE) {
+    if (THREE.NoToneMapping !== undefined) {
+      this.renderer.toneMapping = THREE.NoToneMapping;
+    }
+
+    if ('outputColorSpace' in this.renderer && THREE.SRGBColorSpace) {
+      this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    }
+
+    if ('outputEncoding' in this.renderer && THREE.sRGBEncoding) {
+      this.renderer.outputEncoding = THREE.sRGBEncoding;
+    }
   }
 
   populateSelect() {
@@ -119,6 +166,10 @@ class Tour360App {
     window.addEventListener('orientationchange', () => {
       window.setTimeout(() => this.resize(), 200);
     });
+
+    window.addEventListener('popstate', () => {
+      this.loadPanorama(this.getInitialPanoramaIndex(), { updateUrl: false });
+    });
   }
 
   initControls() {
@@ -127,7 +178,8 @@ class Tour360App {
       camera: this.camera,
       rotateBy: (deltaYaw, deltaPitch) => this.rotateBy(deltaYaw, deltaPitch),
       setFov: (nextFov) => this.setFov(nextFov),
-      setGyroQuaternion: (quaternion) => this.setGyroQuaternion(quaternion),
+      setGyroRotation: (yaw, pitch) => this.setGyroRotation(yaw, pitch),
+      setGyroResetHandler: (handler) => this.setGyroResetHandler(handler),
       setStatus: (message) => this.setStatus(message),
       gyroButton: this.gyroButton
     };
@@ -141,18 +193,19 @@ class Tour360App {
     this.gyroButton.hidden = true;
   }
 
-  loadPanorama(index) {
+  loadPanorama(index, options = {}) {
+    const { updateUrl = true } = options;
     const nextIndex = wrapIndex(index, PANORAMAS.length);
     const panorama = PANORAMAS[nextIndex];
 
-    this.setStatus(`Carregando ${panorama.title}...`);
+    if (updateUrl) {
+      this.updateSceneUrl(nextIndex);
+    }
 
     this.textureLoader.load(
       panorama.src,
       (texture) => {
-        if (this.THREE.sRGBEncoding) {
-          texture.encoding = this.THREE.sRGBEncoding;
-        }
+        this.configureTextureColorSpace(texture);
 
         if (this.currentTexture) {
           this.currentTexture.dispose();
@@ -163,21 +216,82 @@ class Tour360App {
         this.material.needsUpdate = true;
         this.currentIndex = nextIndex;
         this.select.value = String(nextIndex);
-        this.setStatus(`${panorama.title} carregado`);
+        this.applyPanoramaInitialYaw(panorama);
       },
       undefined,
       () => {
-        this.setStatus(`Erro ao carregar ${panorama.title}`);
+        console.error(`Erro ao carregar ${panorama.title}`);
       }
     );
   }
 
-  applyMonoStereoUvCrop(geometry) {
+  getInitialPanoramaIndex() {
+    const params = new URLSearchParams(window.location.search);
+    const scene = params.get(SCENE_QUERY_PARAM);
+
+    if (!scene) {
+      return 0;
+    }
+
+    const sceneIndex = PANORAMAS.findIndex((panorama) => panorama.id === scene);
+
+    if (sceneIndex !== -1) {
+      return sceneIndex;
+    }
+
+    const numericIndex = Number(scene);
+
+    if (Number.isInteger(numericIndex) && numericIndex >= 0 && numericIndex < PANORAMAS.length) {
+      return numericIndex;
+    }
+
+    return 0;
+  }
+
+  updateSceneUrl(index) {
+    const panorama = PANORAMAS[index];
+
+    if (!panorama || !window.history || !window.history.pushState) {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+
+    if (url.searchParams.get(SCENE_QUERY_PARAM) === panorama.id) {
+      return;
+    }
+
+    url.searchParams.set(SCENE_QUERY_PARAM, panorama.id);
+    window.history.pushState({ scene: panorama.id }, '', url);
+  }
+
+  configureTextureColorSpace(texture) {
+    if ('colorSpace' in texture && this.THREE.SRGBColorSpace) {
+      texture.colorSpace = this.THREE.SRGBColorSpace;
+    }
+
+    if (this.THREE.sRGBEncoding) {
+      texture.encoding = this.THREE.sRGBEncoding;
+    }
+
+    texture.needsUpdate = true;
+  }
+
+  degreesToRadians(degrees = 0) {
+    const yaw = Number(degrees);
+
+    if (!Number.isFinite(yaw)) {
+      return 0;
+    }
+
+    return yaw * Math.PI / 180;
+  }
+
+  flipPanoramaUvHorizontally(geometry) {
     const uv = geometry.attributes.uv;
 
-    // Top-down stereo stores one eye per vertical half; use the upper eye for mono 2D.
     for (let index = 0; index < uv.count; index += 1) {
-      uv.setY(index, 0.5 + uv.getY(index) * 0.5);
+      uv.setX(index, 1 - uv.getX(index));
     }
 
     uv.needsUpdate = true;
@@ -188,12 +302,31 @@ class Tour360App {
     this.manualPitch = clamp(this.manualPitch + deltaPitch, -PITCH_LIMIT, PITCH_LIMIT);
   }
 
-  setGyroQuaternion(quaternion) {
-    if (!this.gyroQuaternion) {
-      this.gyroQuaternion = new this.THREE.Quaternion();
+  applyPanoramaInitialYaw(panorama) {
+    if (panorama.yaw === undefined || panorama.yaw === null) {
+      return;
     }
 
-    this.gyroQuaternion.copy(quaternion);
+    this.manualYaw = this.degreesToRadians(panorama.yaw);
+    this.resetGyroForScene();
+  }
+
+  resetGyroForScene() {
+    this.gyroYaw = 0;
+    this.gyroPitch = 0;
+
+    if (this.resetGyroCalibration) {
+      this.resetGyroCalibration();
+    }
+  }
+
+  setGyroRotation(yaw, pitch) {
+    this.gyroYaw = yaw;
+    this.gyroPitch = pitch;
+  }
+
+  setGyroResetHandler(handler) {
+    this.resetGyroCalibration = handler;
   }
 
   setFov(nextFov) {
@@ -202,15 +335,8 @@ class Tour360App {
   }
 
   applyCameraRotation() {
-    if (this.gyroQuaternion) {
-      this.manualEuler.set(this.manualPitch, this.manualYaw, 0);
-      this.manualQuaternion.setFromEuler(this.manualEuler);
-      this.camera.quaternion.copy(this.gyroQuaternion).multiply(this.manualQuaternion);
-      return;
-    }
-
-    this.camera.rotation.y = this.manualYaw;
-    this.camera.rotation.x = this.manualPitch;
+    this.camera.rotation.y = this.manualYaw + this.gyroYaw;
+    this.camera.rotation.x = clamp(this.manualPitch + this.gyroPitch, -PITCH_LIMIT, PITCH_LIMIT);
     this.camera.rotation.z = 0;
   }
 
@@ -230,16 +356,32 @@ class Tour360App {
   }
 
   setStatus(message) {
-    setText(this.status, message);
   }
 
   registerServiceWorker() {
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && !this.isLocalHttps()) {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./service-worker.js')
           .catch(console.error);
       });
     }
+  }
+
+  isLocalHttps() {
+    if (window.location.protocol !== 'https:') {
+      return false;
+    }
+
+    const hostname = window.location.hostname;
+
+    return (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname === '::1' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+    );
   }
 }
 

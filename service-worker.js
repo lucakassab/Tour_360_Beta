@@ -1,20 +1,27 @@
-const CACHE_NAME = 'tour-360-v4';
+const CACHE_NAME = 'tour-360-v18';
 
 const CORE_ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './assets/vendor/three.min.js',
-  './main/core.js',
-  './main/mobile.js',
-  './main/desktop.js',
-  './main/shared/utils.js',
-  './assets/panoramas/panorama_01.jpg',
-  './assets/panoramas/panorama_02.jpg',
-  './assets/panoramas/panorama_03.jpg',
-  './assets/panoramas/panorama_04.jpg',
+  './main/core.js?v=17',
+  './main/mobile.js?v=16',
+  './main/desktop.js?v=16',
+  './main/shared/utils.js?v=16',
+  './assets/brand/logo-feel-pontal-oceanico-transparent.png',
+  './assets/brand/logo-feel-pontal-oceanico-header.png',
+  './assets/brand/logo-mark-transparent.png',
+  './assets/icons/favicon.ico',
+  './assets/icons/favicon-16x16.png',
+  './assets/icons/favicon-32x32.png',
+  './assets/icons/favicon-48x48.png',
+  './assets/icons/apple-touch-icon.png',
+  './assets/icons/mstile-150x150.png',
   './assets/icons/icon-192.png',
-  './assets/icons/icon-512.png'
+  './assets/icons/icon-512.png',
+  './assets/icons/maskable-icon-192.png',
+  './assets/icons/maskable-icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
@@ -56,8 +63,9 @@ async function cacheFirst(request) {
     const response = await fetch(request);
 
     if (response && (response.ok || response.type === 'opaque')) {
-      const cache = await caches.open(CACHE_NAME);
-      cache.put(request, response.clone());
+      caches.open(CACHE_NAME)
+        .then((cache) => cache.put(request, response.clone()))
+        .catch(() => {});
     }
 
     return response;
